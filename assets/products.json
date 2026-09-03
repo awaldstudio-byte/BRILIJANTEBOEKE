@@ -1,0 +1,147 @@
+{
+  "graad-3": {
+    "grade": "3",
+    "title_af": "Graad 3",
+    "title_en": "Grade 3",
+    "price": "R320",
+    "cover": "Book-Cover-Graad-3.png",
+    "tag_af": "Maak Afrikaans ’n avontuur!",
+    "tag_en": "Make Afrikaans an adventure!",
+    "desc_af": "Heeltyd Speeltyd is ’n praktiese en prettige werkboek vir Graad 3-leerders wat Afrikaans as Eerste Addisionele Taal aanleer. Die boek kombineer klankleer, woordeskat, leesbegrip, praatvaardighede en taalwerk op ’n speelse en kreatiewe manier.",
+    "desc_en": "Heeltyd Speeltyd is a practical and fun workbook for Grade 3 learners studying Afrikaans as a First Additional Language. It combines phonics, vocabulary, reading comprehension, speaking skills and language work in a playful, creative way.",
+    "features_af": [
+      "Klankleer, woordeskat en leesbegrip",
+      "Visuele aktiwiteite en blokkiesraaisels",
+      "Interaktiewe 3D-projekte en speletjies",
+      "Taal- én lewensvaardighede"
+    ],
+    "features_en": [
+      "Phonics, vocabulary and comprehension",
+      "Visual activities and crosswords",
+      "Interactive 3D projects and games",
+      "Language and life skills"
+    ],
+    "samples": [
+      "Graad-3-content-5.png",
+      "Graad-3-content-9.png",
+      "Graad-3-content-14.png",
+      "Graad-3-content-2.png"
+    ]
+  },
+  "graad-4": {
+    "grade": "4",
+    "title_af": "Graad 4",
+    "title_en": "Grade 4",
+    "price": "R340",
+    "cover": "Book-Cover-Graad-4.png",
+    "tag_af": "’n Taalreis vol avontuur en kreatiwiteit.",
+    "tag_en": "A language journey filled with adventure and creativity.",
+    "desc_af": "Die Graad 4 Afrikaans FAL Werkboek bou luister-, lees-, praat- en skryfvaardighede met relevante temas, verskeie tekste, formele assesserings en prettige aktiwiteite.",
+    "desc_en": "The Grade 4 Afrikaans FAL Workbook builds listening, reading, speaking and writing skills through relevant themes, varied texts, formal assessments and engaging activities.",
+    "features_af": [
+      "Volledige kurrikulumdekking",
+      "Interaktiewe knip-en-plak take en speletjies",
+      "Assessering met rubrieke",
+      "Digitale hulpbronne en QR-kodes"
+    ],
+    "features_en": [
+      "Complete curriculum coverage",
+      "Interactive cut-and-paste tasks and games",
+      "Assessment with rubrics",
+      "Digital resources and QR codes"
+    ],
+    "samples": [
+      "Graad-4-content-3.png",
+      "Graad-4-content-8.png",
+      "Graad-4-content-12.png",
+      "Graad-4-content-15.png"
+    ]
+  },
+  "graad-5": {
+    "grade": "5",
+    "title_af": "Graad 5",
+    "title_en": "Grade 5",
+    "price": "R340",
+    "cover": "Book-Cover-Graad-5-1.png",
+    "tag_af": "Ruimte, safari en taalontwikkeling.",
+    "tag_en": "Space, safari and language development.",
+    "desc_af": "Hierdie volledige Afrikaans Eerste Addisionele Taal-werkboek neem Graad 5-leerders op ’n opwindende reis deur die ruimte en op safari. Elke les is kreatief ontwerp om taalvaardighede en selfvertroue te bou.",
+    "desc_en": "This complete Afrikaans First Additional Language workbook takes Grade 5 learners on an exciting journey through space and safari. Each lesson is designed to build language skills and confidence.",
+    "features_af": [
+      "Volledige kurrikulumdekking",
+      "Ruimte-avontuur en Safari in Afrika",
+      "Assessering en rubrieke",
+      "Kreatiewe projekte en digitale integrasie"
+    ],
+    "features_en": [
+      "Complete curriculum coverage",
+      "Space Adventure and African Safari themes",
+      "Assessments and rubrics",
+      "Creative projects and digital integration"
+    ],
+    "samples": [
+      "Graad-5-content-page-2-1.png",
+      "Graad-5-content-page-6.png",
+      "Graad-5-content-page-19-1.png",
+      "Graad-5-content-page-20-1.png"
+    ]
+  },
+  "graad-6": {
+    "grade": "6",
+    "title_af": "Graad 6",
+    "title_en": "Grade 6",
+    "price": "R340",
+    "cover": "Book-Cover-Graad-6.png",
+    "tag_af": "Kreatiwiteit, tegnologie en Suid-Afrika.",
+    "tag_en": "Creativity, technology and South Africa.",
+    "desc_af": "Die Graad 6 Afrikaans FAL Werkboek gebruik temas soos ruimte, strokiesprente, videospeletjies en reis deur Suid-Afrika om taalvaardighede prakties en interaktief te ontwikkel.",
+    "desc_en": "The Grade 6 Afrikaans FAL Workbook uses themes such as space, comics, video games and travel through South Africa to develop language skills in a practical, interactive way.",
+    "features_af": [
+      "Luister, praat, lees, begrip en skryf",
+      "Stories, gedigte, artikels en visuele tekste",
+      "Assessering met duidelike riglyne",
+      "Woordeskat-speletjies en digitale hulpbronne"
+    ],
+    "features_en": [
+      "Listening, speaking, reading, comprehension and writing",
+      "Stories, poems, articles and visual texts",
+      "Assessment with clear guidelines",
+      "Vocabulary games and digital resources"
+    ],
+    "samples": [
+      "Graad-6-content-page-5.png",
+      "Graad-6-content-page-11.png",
+      "Graad-6-content-page-16.png",
+      "Graad-6-content-page-17.png"
+    ]
+  },
+  "graad-7": {
+    "grade": "7",
+    "title_af": "Graad 7",
+    "title_en": "Grade 7",
+    "price": "R340",
+    "cover": "Book-Cover-Graad-7.png",
+    "tag_af": "Vermaak, tegnologie en adrenalien.",
+    "tag_en": "Entertainment, technology and adrenaline.",
+    "desc_af": "Die Graad 7 Afrikaans FAL Werkboek kombineer relevante temas, verskeie tekstipes en ’n balans tussen formele assessering en prettige aktiwiteite om leerders se taalvaardighede te versterk.",
+    "desc_en": "The Grade 7 Afrikaans FAL Workbook combines relevant themes, varied text types and a balance of formal assessment and engaging activities to strengthen learners’ language skills.",
+    "features_af": [
+      "Volledige kurrikulumdekking",
+      "Vermaak, tegnologie en sport-temas",
+      "Verskeie tekstipes",
+      "Assessering, woordeskat en digitale hulpbronne"
+    ],
+    "features_en": [
+      "Complete curriculum coverage",
+      "Entertainment, technology and sport themes",
+      "Varied text types",
+      "Assessment, vocabulary and digital resources"
+    ],
+    "samples": [
+      "Graad-7-content-page-4.png",
+      "Graad-7-content-page-8-1.png",
+      "Graad-7-content-page-10.png",
+      "Graad-7-content-page-16.png"
+    ]
+  }
+}
