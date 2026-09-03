@@ -1,18 +1,12 @@
-# Briljante Boeke — Static Site
+# Briljante Boeke — original-look migration
 
-Production-ready static conversion of the supplied WPvivid/WordPress backup.
+This package was reconstructed from the supplied WPvivid backup with the **existing client-facing design as the source of truth**. It preserves the Blocksy/Elementor colours, typography, header/footer, page structure, book assets, banner video and quote-based sales flow. WordPress/PHP/WooCommerce runtime code is intentionally not required on Vercel.
 
-## Deploy to Vercel
-1. Push this folder to a GitHub repository.
-2. Import the repository in Vercel.
-3. Framework preset: **Other**. No build command is required.
-4. Add `briljanteboeke.co.za` and `www.briljanteboeke.co.za` to the Vercel project, then apply Vercel's DNS records at the registrar.
+## Deploy
+Upload the contents of this folder to the GitHub repository root and redeploy in Vercel with Framework Preset **Other**. No build command is required.
 
-## Current sales flow
-WooCommerce/cart/checkout are intentionally not used. Customers browse the catalogue and send quote/enquiry emails to `sales@briljanteboeke.co.za`.
+## Sales flow
+The visible `Voeg by kwotasie` workflow remains. The quote list is stored in the visitor browser and `Send Your Request` opens a pre-filled email to `sales@briljanteboeke.co.za`. There is no online checkout.
 
 ## Important
-The contact and quotation forms currently open the visitor's email client with the message pre-filled. If a server-side form is wanted later, connect a mail provider or form service.
-
-## Content source
-Text, book covers, sample pages, logo and banner video were recovered from the supplied WordPress backup.
+Do not mix files from the earlier redesigned conversion with this package. Replace the repository contents with this folder.

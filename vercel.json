@@ -1,19 +1,46 @@
 {
-  "cleanUrls": true,
+  "cleanUrls": false,
   "trailingSlash": true,
-  "headers": [
+  "redirects": [
     {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "Referrer-Policy",
-          "value": "strict-origin-when-cross-origin"
-        }
-      ]
+      "source": "/index.php/books/",
+      "destination": "/books/",
+      "permanent": true
+    },
+    {
+      "source": "/index.php/request-quote/",
+      "destination": "/request-quote/",
+      "permanent": true
+    },
+    {
+      "source": "/index.php/contact/",
+      "destination": "/contact/",
+      "permanent": true
+    },
+    {
+      "source": "/index.php/about/",
+      "destination": "/about/",
+      "permanent": true
+    },
+    {
+      "source": "/privacy/",
+      "destination": "/privacy-policy-2/",
+      "permanent": true
+    },
+    {
+      "source": "/terms/",
+      "destination": "/refund_returns/",
+      "permanent": true
+    },
+    {
+      "source": "/catalogue/",
+      "destination": "/books/",
+      "permanent": true
+    },
+    {
+      "source": "/quote/",
+      "destination": "/request-quote/",
+      "permanent": true
     }
   ]
 }
