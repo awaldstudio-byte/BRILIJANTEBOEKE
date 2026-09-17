@@ -14,7 +14,7 @@ async function init() {
     return;
   }
   try {
-    const session = await api("/api/admin-session");
+    const session = await api("/api/admin-dashboard?session=1");
     showAdmin(session.staff);
     await loadData();
   } catch {

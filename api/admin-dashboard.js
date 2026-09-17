@@ -6,6 +6,8 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
   try {
     const { staff } = await requireStaff(req, res);
+    if (String(req.query?.session ?? "") === "1") return json(res, 200, { staff });
+
     const database = serviceClient();
     const [schools, pending, paid, revenue, recent, periods] = await Promise.all([
       database.from("schools").select("id", { count: "exact", head: true }).eq("status", "active"),
