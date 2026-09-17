@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="af">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Bestel werkboeke | Briljante Boeke</title>
+    <link rel="icon" href="/assets/images/favicon.png" />
+    <link rel="stylesheet" href="/assets/roboto.css" />
+    <link rel="stylesheet" href="/assets/phase1.css" />
+  </head>
+  <body class="order-page">
+    <header class="phase-header">
+      <div class="phase-header-inner">
+        <a href="/" aria-label="Briljante Boeke tuis"><img src="/assets/images/logo-white.png" alt="Briljante Boeke" /></a>
+        <span>Veilige skoolbestelling</span>
+      </div>
+    </header>
+
+    <main class="order-shell">
+      <section id="loading-state" class="notice-card" aria-live="polite">Skoolbesonderhede word gelaai…</section>
+      <section id="error-state" class="notice-card notice-error" hidden>
+        <h1>Hierdie skoolskakel is nie beskikbaar nie</h1>
+        <p id="error-message">Kontroleer asseblief die skakel wat deur die skool verskaf is.</p>
+      </section>
+
+      <div id="order-app" hidden>
+        <section class="order-intro">
+          <div>
+            <p class="phase-label">PRIVAAT SKOOLBESTELLING</p>
+            <h1>Bestel werkboeke</h1>
+            <p>Kies die toepaslike werkboek vir elke leerder. Meer as een kind van dieselfde skool kan in een betaling ingesluit word.</p>
+          </div>
+          <aside class="school-summary">
+            <span class="school-initial" id="school-initial">S</span>
+            <div><strong id="school-name"></strong><span id="period-summary"></span></div>
+          </aside>
+        </section>
+
+        <ol class="step-progress" aria-label="Bestelproses">
+          <li class="active" data-step-indicator="1"><span>1</span> Leerders</li>
+          <li data-step-indicator="2"><span>2</span> Besonderhede</li>
+          <li data-step-indicator="3"><span>3</span> Hersien en betaal</li>
+        </ol>
+
+        <div class="order-grid">
+          <section class="catalogue-card" aria-labelledby="books-title">
+            <div class="card-title-row">
+              <div><p class="phase-label">BESKIKBAAR VIR HIERDIE SKOOL</p><h2 id="books-title">Werkboeke</h2></div>
+              <span id="book-count" class="quiet-text"></span>
+            </div>
+            <div id="book-grid" class="book-grid"></div>
+          </section>
+
+          <aside class="checkout-card">
+            <section id="step-1" class="step-panel">
+              <div class="card-title-row compact"><div><p class="phase-label">HUIDIGE BESTELLING</p><h2>Leerders</h2></div><span id="learner-count" class="count-badge">1</span></div>
+              <div id="learner-list" class="learner-list"></div>
+              <button id="add-learner" class="btn btn-outline btn-full" type="button">Voeg nog ’n leerder by</button>
+              <div class="total-line"><span>Totaal</span><strong id="order-total">R0,00</strong></div>
+              <button id="continue-details" class="btn btn-primary btn-full" type="button">Gaan voort</button>
+              <p id="learner-error" class="form-message" role="alert"></p>
+            </section>
+
+            <section id="step-2" class="step-panel" hidden>
+              <p class="phase-label">OUERBESONDERHEDE</p>
+              <h2>Kontakbesonderhede</h2>
+              <form id="parent-form" class="form-stack">
+                <div class="field-pair">
+                  <label>Naam<input name="first_name" autocomplete="given-name" required minlength="2" maxlength="100" /></label>
+                  <label>Van<input name="last_name" autocomplete="family-name" required minlength="2" maxlength="100" /></label>
+                </div>
+                <label>E-posadres<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
+                <label>Selfoonnommer<input name="mobile" type="tel" autocomplete="tel" required minlength="7" maxlength="30" /></label>
+                <label class="consent-line"><input name="consent" type="checkbox" required /> <span>Ek bevestig dat die besonderhede korrek is en aanvaar die <a href="/privacy-policy-2/" target="_blank" rel="noopener">privaatheidsbeleid</a> en <a href="/refund_returns/" target="_blank" rel="noopener">bepalings</a>.</span></label>
+                <div class="button-row"><button class="btn btn-outline" type="button" data-back="1">Terug</button><button class="btn btn-primary" type="submit">Hersien bestelling</button></div>
+              </form>
+            </section>
+
+            <section id="step-3" class="step-panel" hidden>
+              <p class="phase-label">BESTELLING</p>
+              <h2>Hersien en betaal</h2>
+              <div id="review-lines" class="review-lines"></div>
+              <div class="total-line"><span>Bedrag betaalbaar</span><strong id="review-total">R0,00</strong></div>
+              <p class="secure-note">Die bestelling word slegs as betaal gemerk nadat PayFast se betalingskennisgewing deur die stelsel geverifieer is.</p>
+              <div class="button-row"><button class="btn btn-outline" type="button" data-back="2">Terug</button><button id="pay-button" class="btn btn-primary" type="button">Betaal met PayFast</button></div>
+              <p id="payment-message" class="form-message" role="status"></p>
+            </section>
+          </aside>
+        </div>
+      </div>
+    </main>
+
+    <footer class="phase-footer"><span>Briljante Boeke</span><span>Veilige betalings deur PayFast</span></footer>
+    <script type="module" src="/assets/order-app.js"></script>
+  </body>
+</html>

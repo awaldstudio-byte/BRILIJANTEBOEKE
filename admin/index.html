@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="af">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow,noarchive" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Administrasie | Briljante Boeke</title>
+    <link rel="icon" href="/assets/images/favicon.png" />
+    <link rel="stylesheet" href="/assets/roboto.css" />
+    <link rel="stylesheet" href="/assets/phase1.css" />
+  </head>
+  <body class="admin-page">
+    <header class="admin-header"><div class="admin-brand"><img src="/assets/images/logo-white.png" alt="Briljante Boeke" /><span>Administrasie</span></div><div id="admin-user" class="admin-user" hidden><span id="user-initial" class="user-initial">B</span><span id="user-name"></span><button id="logout-button" type="button">Teken uit</button></div></header>
+
+    <main id="login-view" class="login-shell">
+      <form id="login-form" class="login-card">
+        <p class="phase-label">INTERNE TOEGANG</p><h1>Meld aan</h1><p>Gebruik die Briljante-administrasierekening.</p>
+        <label>E-posadres<input name="email" type="email" autocomplete="username" required /></label>
+        <label>Wagwoord<input name="password" type="password" autocomplete="current-password" minlength="8" required /></label>
+        <button class="btn btn-primary btn-full" type="submit">Meld aan</button><p id="login-message" class="form-message" role="alert"></p>
+      </form>
+    </main>
+
+    <div id="admin-app" class="admin-shell" hidden>
+      <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="reports">Verslae</button><span>Interne toegang vir Briljante</span></nav>
+      <main class="admin-main">
+        <section id="view-overview" class="admin-view">
+          <div class="admin-title"><div><p class="phase-label">BRILJANTE ADMINISTRASIE</p><h1>Oorsig</h1></div><time id="today"></time></div>
+          <div id="metric-grid" class="metric-grid"></div>
+          <div class="admin-content-grid">
+            <article class="data-card wide"><div class="card-title-row"><div><p class="phase-label">VORDERING</p><h2>Bestellings per skool en graad</h2></div></div><div class="table-wrap"><table><thead><tr><th>Skool</th><th>Jaar</th><th>Graad</th><th>Verwag</th><th>Betaal</th><th>Uitstaande</th><th>Vordering</th></tr></thead><tbody id="progress-rows"></tbody></table></div></article>
+            <article class="data-card"><p class="phase-label">BESTELPERIODES</p><h2>Huidige periodes</h2><div id="period-list" class="list-stack"></div></article>
+            <article class="data-card wide"><div class="card-title-row"><div><p class="phase-label">ONLANGS</p><h2>Onlangse bestellings</h2></div><button class="text-button" data-view-link="orders">Sien alle bestellings</button></div><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Verwysing</th><th>Skool</th><th>Ouer</th><th>Bedrag</th><th>Status</th></tr></thead><tbody id="recent-order-rows"></tbody></table></div></article>
+          </div>
+        </section>
+
+        <section id="view-orders" class="admin-view" hidden>
+          <div class="admin-title"><div><p class="phase-label">REKORDS</p><h1>Bestellings</h1></div><a id="orders-export" class="btn btn-outline" href="/api/admin-paid-export">Laai betaalde leerderlys af</a></div>
+          <form id="order-filters" class="filter-bar"><input name="search" placeholder="Verwysing, van of e-pos" /><select name="status"><option value="">Alle statusse</option><option value="pending_payment">Wag vir betaling</option><option value="paid">Betaal</option><option value="payment_failed">Betaling onsuksesvol</option><option value="cancelled">Gekanselleer</option></select><select name="school_id"><option value="">Alle skole</option></select><button class="btn btn-primary" type="submit">Filter</button></form>
+          <article class="data-card"><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Verwysing</th><th>Skool</th><th>Leerders</th><th>Ouer</th><th>Bedrag</th><th>Status</th></tr></thead><tbody id="all-order-rows"></tbody></table></div><p id="orders-empty" class="empty-state" hidden>Geen bestellings pas by die filter nie.</p></article>
+        </section>
+
+        <section id="view-schools" class="admin-view" hidden>
+          <div class="admin-title"><div><p class="phase-label">OPSTELLING</p><h1>Skole</h1></div><button id="new-school" class="btn btn-primary" type="button">Voeg skool by</button></div>
+          <div class="school-admin-grid"><article class="data-card"><h2>Bestaande skole</h2><div id="school-list" class="school-list"></div></article><form id="school-form" class="data-card form-stack"><input name="school_id" type="hidden" /><input name="period_id" type="hidden" /><div class="card-title-row"><div><p class="phase-label">SKOOL EN BESTELPERIODE</p><h2 id="school-form-title">Nuwe skool</h2></div></div><div class="field-pair"><label>Skoolnaam<input name="school_name" required maxlength="160" /></label><label>Skakelfragment<input name="school_slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" /></label></div><div class="field-pair"><label>Kontakpersoon<input name="contact_name" maxlength="160" /></label><label>Kontak-e-pos<input name="contact_email" type="email" maxlength="254" /></label></div><div class="field-pair"><label>Akademiese jaar<select name="academic_year_id" required></select></label><label>Naam van bestelperiode<input name="period_name" required value="Ouersbestellings" /></label></div><div class="field-pair"><label>Open vanaf<input name="opens_at" type="datetime-local" required /></label><label>Sluit op<input name="closes_at" type="datetime-local" required /></label></div><div class="field-pair"><label>Status<select name="period_status"><option value="draft">Konsep</option><option value="open">Oop</option><option value="closed">Gesluit</option><option value="archived">Geargiveer</option></select></label><label class="checkbox-field"><input name="class_required" type="checkbox" /> Klas is verpligtend</label></div><label>Afleweringsnota<textarea name="delivery_note" rows="3" maxlength="1000"></textarea></label><fieldset><legend>Grade, pryse en verwagte hoeveelhede</legend><div id="offering-fields" class="offering-fields"></div></fieldset><label class="checkbox-field"><input name="replace_link" type="checkbox" /> Vervang die huidige private skoolskakel</label><button class="btn btn-primary" type="submit">Stoor skoolopstelling</button><p id="school-form-message" class="form-message" role="status"></p><div id="generated-link" class="generated-link" hidden><strong>Nuwe private skoolskakel</strong><input readonly /><button class="btn btn-outline" type="button">Kopieer skakel</button><small>Hierdie skakel word slegs een keer volledig gewys.</small></div></form></div>
+        </section>
+
+        <section id="view-reports" class="admin-view" hidden>
+          <div class="admin-title"><div><p class="phase-label">VERSLAE</p><h1>Betaalde leerderlyste</h1></div></div>
+          <article class="data-card report-card"><p>Laai ’n CSV-lys af met die betaalde leerders, grade, klasse, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.</p><div class="field-pair"><label>Skool<select id="report-school"><option value="">Alle skole</option></select></label><label>Bestelperiode<select id="report-period"><option value="">Alle periodes</option></select></label></div><a id="report-download" class="btn btn-primary" href="/api/admin-paid-export">Laai CSV af</a></article>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/assets/admin-app.js"></script>
+  </body>
+</html>
