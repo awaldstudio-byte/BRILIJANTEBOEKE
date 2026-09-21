@@ -57,13 +57,14 @@ export function checkoutRequest({
   merchantKey,
   passphrase,
   appOrigin,
+  language = "af",
   order,
 }) {
   const fields = [
     ["merchant_id", merchantId],
     ["merchant_key", merchantKey],
-    ["return_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}`],
-    ["cancel_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}&cancelled=1`],
+    ["return_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}&lang=${language}`],
+    ["cancel_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}&cancelled=1&lang=${language}`],
     ["notify_url", `${appOrigin}/api/payfast-notify`],
     ["name_first", order.parentFirstName],
     ["name_last", order.parentLastName],

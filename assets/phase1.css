@@ -30,6 +30,10 @@ a { color: #0868b8; }
 .phase-header-inner { width: min(1338px, 88vw); min-height: 104px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 32px; color: white; }
 .phase-header img { width: 195px; max-height: 88px; display: block; object-fit: contain; }
 .phase-header span { font-size: .83rem; font-weight: 700; letter-spacing: .04em; }
+.header-actions { display: flex; align-items: center; gap: 18px; }
+.language-switch { display: inline-flex; border: 1px solid rgba(255, 255, 255, .45); border-radius: 4px; overflow: hidden; }
+.language-switch button { min-width: 42px; border: 0; background: transparent; color: white; padding: 6px 9px; cursor: pointer; font-size: .72rem; font-weight: 700; }
+.language-switch button.active { background: white; color: var(--navy); }
 .phase-label { margin-bottom: 7px; color: #39708e; font-size: .72rem; font-weight: 800; letter-spacing: .12em; }
 .quiet-text { color: var(--muted); font-size: .86rem; }
 .order-shell { width: min(1338px, 88vw); min-height: calc(100vh - 170px); margin: 0 auto; padding: 50px 0 80px; }
@@ -68,6 +72,8 @@ a { color: #0868b8; }
 .book-copy strong { display: block; margin-bottom: 14px; font-size: 1.12rem; }
 .learner-list { display: grid; gap: 14px; }
 .learner-card { border: 1px solid var(--line); border-radius: 6px; background: var(--soft); padding: 16px; }
+.learner-card.active { border-color: var(--turquoise); box-shadow: 0 0 0 2px rgba(17, 210, 205, .13); }
+.book-option.selected { border-color: var(--turquoise); box-shadow: 0 0 0 2px rgba(17, 210, 205, .13); }
 .learner-heading { margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
 .learner-heading button { border: 0; background: transparent; color: #236ba1; font-size: .78rem; cursor: pointer; }
 .learner-heading button:disabled { color: #adb6bf; cursor: default; }
@@ -173,6 +179,9 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 .generated-link { margin-top: 12px; border: 1px solid #bcdedb; border-radius: 5px; background: #f1fbfa; padding: 14px; }
 .generated-link strong, .generated-link small { display: block; }
 .generated-link input { font-family: monospace; }
+.share-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.share-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
+.access-code { font-family: monospace; font-size: 1.05rem; font-weight: 800; letter-spacing: .08em; }
 .report-card { max-width: 760px; }
 
 @media (max-width: 1120px) {
@@ -189,6 +198,7 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
   .phase-header-inner, .order-shell { width: 90vw; }
   .phase-header img { width: 150px; max-height: 70px; }
   .phase-header-inner > span { display: none; }
+  .header-actions > span { display: none; }
   .order-shell { padding-top: 28px; }
   .order-intro { grid-template-columns: 1fr; gap: 18px; }
   .school-summary { min-width: 0; }

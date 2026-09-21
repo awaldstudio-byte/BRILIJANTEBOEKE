@@ -14,12 +14,18 @@
     <header class="phase-header">
       <div class="phase-header-inner">
         <a href="/" aria-label="Briljante Boeke tuis"><img src="/assets/images/logo-white.png" alt="Briljante Boeke" /></a>
-        <span>Veilige skoolbestelling</span>
+        <div class="header-actions"><span>Veilige skoolbestelling</span><div class="language-switch" aria-label="Language"><button type="button" data-language="af">AF</button><button type="button" data-language="en">EN</button></div></div>
       </div>
     </header>
 
     <main class="order-shell">
       <section id="loading-state" class="notice-card" aria-live="polite">Skoolbesonderhede word gelaai…</section>
+      <section id="access-view" class="notice-card" hidden>
+        <p class="phase-label">PRIVAAT SKOOLBESTELLING</p>
+        <h1>Voer die skoolkode in</h1>
+        <p>Gebruik die toegangskode wat deur die skool of Briljante Boeke verskaf is.</p>
+        <form id="access-form" class="form-stack"><label>Skoolkode<input name="access_code" class="access-code" required minlength="8" maxlength="20" autocomplete="one-time-code" placeholder="ABCDE-23456" /></label><button class="btn btn-primary" type="submit">Gaan voort</button></form>
+      </section>
       <section id="error-state" class="notice-card notice-error" hidden>
         <h1>Hierdie skoolskakel is nie beskikbaar nie</h1>
         <p id="error-message">Kontroleer asseblief die skakel wat deur die skool verskaf is.</p>

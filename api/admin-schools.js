@@ -23,7 +23,7 @@ async function list(req, res) {
       database.from("schools").select("id, slug, name, status, contact_name, contact_email, notes").order("name"),
       database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, class_required, delivery_note"),
       database.from("school_grade_offerings").select("id, school_id, ordering_period_id, grade_id, book_id, price_cents, expected_quantity, active"),
-      database.from("school_access").select("id, school_id, ordering_period_id, label, expires_at, revoked_at, last_used_at, created_at").is("revoked_at", null),
+      database.from("school_access").select("id, school_id, ordering_period_id, label, code_hint, expires_at, revoked_at, last_used_at, created_at").is("revoked_at", null),
     ]);
     for (const result of [years, grades, books, schools, periods, offerings, access]) assertDatabaseResult(result.error);
     return json(res, 200, {
@@ -120,6 +120,7 @@ async function save(req, res) {
     assertDatabaseResult(offeringError);
 
     let generatedLink = null;
+    let generatedCode = null;
     const { data: currentAccess, error: accessError } = await database
       .from("school_access")
       .select("id")
@@ -136,16 +137,18 @@ async function save(req, res) {
           .in("id", currentAccess.map((item) => item.id));
         assertDatabaseResult(revokeError);
       }
-      const rawToken = randomBytes(32).toString("base64url");
+      const rawToken = accessCode();
       const { error: newAccessError } = await database.from("school_access").insert({
         school_id: school.id,
         ordering_period_id: period.id,
         token_hash: sha256(rawToken),
-        label: `${school.name} parent order link`,
+        code_hint: rawToken.replace("-", "").slice(-4),
+        label: `${school.name} parent access code`,
         expires_at: period.closes_at,
       });
       assertDatabaseResult(newAccessError);
-      generatedLink = `${env().appOrigin}/order/?school=${encodeURIComponent(rawToken)}`;
+      generatedCode = rawToken;
+      generatedLink = `${env().appOrigin}/order/?school=${encodeURIComponent(rawToken)}&lang=en`;
     }
 
     const { error: auditError } = await database.from("audit_events").insert({
@@ -157,7 +160,12 @@ async function save(req, res) {
     });
     assertDatabaseResult(auditError);
 
-    return json(res, input.school.id ? 200 : 201, { school, period, generated_link: generatedLink });
+    return json(res, input.school.id ? 200 : 201, {
+      school,
+      period,
+      generated_link: generatedLink,
+      generated_code: generatedCode,
+    });
   } catch (error) {
     if (error.statusCode !== 401) console.error("admin-schools-save", { code: error.code, message: error.message });
     const result = publicError(error);
@@ -247,4 +255,11 @@ function validDate(value, message) {
     throw error;
   }
   return new Date(value).toISOString();
+}
+
+function accessCode() {
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = randomBytes(10);
+  const characters = [...bytes].map((byte) => alphabet[byte % alphabet.length]);
+  return `${characters.slice(0, 5).join("")}-${characters.slice(5).join("")}`;
 }

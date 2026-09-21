@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       merchantKey: config.payfastMerchantKey,
       passphrase: config.payfastPassphrase,
       appOrigin: config.appOrigin,
+      language: input.language,
       order: {
         reference: order.reference,
         amountCents: order.amount_cents,

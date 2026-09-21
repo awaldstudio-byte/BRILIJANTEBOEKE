@@ -7,7 +7,7 @@ export default async function handler(req, res) {
 
   try {
     const token = typeof req.query.token === "string" ? req.query.token.trim() : "";
-    if (token.length < 20 || token.length > 300) return json(res, 404, { error: "This school link is unavailable." });
+    if (token.length < 8 || token.length > 300) return json(res, 404, { error: "This school link or access code is unavailable." });
 
     const database = serviceClient();
     const tokenHash = sha256(token);
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       .maybeSingle();
     assertDatabaseResult(accessError);
     if (!access || access.revoked_at || (access.expires_at && new Date(access.expires_at) <= new Date())) {
-      return json(res, 404, { error: "This school link is unavailable." });
+      return json(res, 404, { error: "This school link or access code is unavailable." });
     }
 
     const [{ data: school, error: schoolError }, { data: period, error: periodError }] = await Promise.all([
@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       period?.status === "open" &&
       Date.parse(period.opens_at) <= now &&
       Date.parse(period.closes_at) > now;
-    if (!school || !period) return json(res, 404, { error: "This school link is unavailable." });
+    if (!school || !period) return json(res, 404, { error: "This school link or access code is unavailable." });
 
     const { data: offerings, error: offeringsError } = await database
       .from("school_grade_offerings")

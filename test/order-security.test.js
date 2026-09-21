@@ -30,6 +30,20 @@ test("order input accepts multiple learners and rejects malformed offerings", ()
   }), /available grade/i);
 });
 
+test("order input accepts a generated school access code but rejects undersized codes", () => {
+  const base = {
+    school_token: "ABCDE-23456",
+    request_id: "550e8400-e29b-41d4-a716-446655440000",
+    parent: { first_name: "Annelie", last_name: "Jacobs", email: "annelie@example.com", mobile: "0825550123" },
+    learners: [
+      { first_name: "Mia", last_name: "Jacobs", offering_id: "2de1d6a7-02b5-41e0-b9ee-b276c4d65041", class_name: "3A" },
+    ],
+  };
+
+  assert.equal(validateOrderInput(base).schoolToken, "ABCDE-23456");
+  assert.throws(() => validateOrderInput({ ...base, school_token: "ABC-123" }), /school link/i);
+});
+
 test("database migration locks every Phase 1 table behind RLS and service access", async () => {
   const migration = await readFile(new URL("../supabase/migrations/20260916205449_phase1_initial_schema.sql", import.meta.url), "utf8");
   const tables = ["schools", "ordering_periods", "school_grade_offerings", "school_access", "orders", "learners", "order_items", "payment_attempts", "payment_events", "staff_users", "notification_jobs", "audit_events"];

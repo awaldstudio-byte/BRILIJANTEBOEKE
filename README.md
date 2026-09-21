@@ -4,7 +4,7 @@ This repository contains the existing Briljante Boeke public website and the Pha
 
 ## Phase 1 functions
 
-- Private order links tied to one school and one ordering period
+- Private access codes and order links tied to one school and one ordering period
 - School-specific grade availability, prices and expected quantities
 - One parent order containing one or more learners from that school
 - Learner name, surname, grade and optional or required class
@@ -12,6 +12,8 @@ This repository contains the existing Briljante Boeke public website and the Pha
 - Server-calculated order totals
 - PayFast checkout and server-to-server payment verification
 - Briljante staff login, dashboard, school setup, order tracking and paid-learner CSV export
+- Afrikaans and English parent-order and Briljante administration interfaces
+- One-time display of each new school code and link, with copy controls and a prepared email draft for Briljante to send
 - Academic-year history and ordering-period open, close and archive states
 - Audit records and queued parent/staff payment notifications
 
@@ -43,6 +45,8 @@ The static preview modes do not send orders, personal data or payments:
 
 - `/order/?preview=1`
 - `/admin/?preview=1`
+
+Add `&lang=en` to either preview URL for the English interface.
 
 ## Environment variables
 
@@ -92,7 +96,7 @@ The Briljante administration page requires only the confirmed operational inform
 - Whether class is required
 - Optional delivery note
 
-Saving a new setup generates the private parent order link. Replacing a link revokes the previous active link.
+Saving a new setup generates a private parent access code and order link. Briljante can copy either value or open a prepared email addressed to the school contact. Generating a replacement code revokes the previous active code.
 
 ## PayFast acceptance
 

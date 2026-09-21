@@ -3,7 +3,7 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 export function validateOrderInput(body) {
   if (!body || typeof body !== "object") throw badRequest("Order details are required.");
-  const schoolToken = text(body.school_token, 20, 300, "The school link is invalid.");
+  const schoolToken = text(body.school_token, 8, 300, "The school link or access code is invalid.");
   const idempotencyKey = text(body.request_id, 16, 100, "The request identifier is invalid.");
   const parent = body.parent ?? {};
   const firstName = text(parent.first_name, 2, 100, "Enter the parent's first name.");
@@ -35,6 +35,7 @@ export function validateStatusInput(body) {
   return {
     reference: text(body?.reference, 6, 40, "The order reference is invalid.").toUpperCase(),
     orderToken: text(body?.order_token, 20, 200, "The order access token is invalid."),
+    language: body?.language === "en" ? "en" : "af",
   };
 }
 
