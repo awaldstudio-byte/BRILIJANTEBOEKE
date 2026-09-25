@@ -19,7 +19,6 @@ export function validateOrderInput(body) {
   const learners = body.learners.map((learner) => ({
     first_name: text(learner?.first_name, 2, 100, "Enter each learner's first name."),
     last_name: text(learner?.last_name, 2, 100, "Enter each learner's surname."),
-    class_name: optionalText(learner?.class_name, 30),
     offering_id: uuid(learner?.offering_id, "Select an available grade for each learner."),
   }));
 

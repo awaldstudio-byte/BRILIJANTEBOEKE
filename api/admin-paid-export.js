@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     const database = serviceClient();
     let query = database
       .from("orders")
-      .select("reference, parent_first_name, parent_last_name, parent_email, parent_mobile, amount_cents, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, class_name, grades(name))")
+      .select("reference, parent_first_name, parent_last_name, parent_email, parent_mobile, amount_cents, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name))")
       .eq("status", "paid")
       .order("paid_at", { ascending: true });
     if (typeof req.query.school_id === "string" && req.query.school_id) query = query.eq("school_id", req.query.school_id);
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     assertDatabaseResult(error);
 
     const rows = [[
-      "School", "Academic year", "Ordering period", "Grade", "Class", "Learner first name", "Learner surname",
+      "School", "Academic year", "Ordering period", "Grade", "Learner first name", "Learner surname",
       "Parent first name", "Parent surname", "Parent email", "Parent mobile", "Order reference", "Order total", "Paid at",
     ]];
     for (const order of data ?? []) {
@@ -28,7 +28,6 @@ export default async function handler(req, res) {
           order.ordering_periods?.academic_years?.year,
           order.ordering_periods?.name,
           learner.grades?.name,
-          learner.class_name,
           learner.first_name,
           learner.last_name,
           order.parent_first_name,

@@ -25,7 +25,7 @@ export default async function handler(req, res) {
       database.from("schools").select("id, slug, name, status").eq("id", access.school_id).maybeSingle(),
       database
         .from("ordering_periods")
-        .select("id, name, opens_at, closes_at, status, class_required, delivery_note, academic_years(year, label)")
+        .select("id, name, opens_at, closes_at, status, delivery_note, academic_years(year, label)")
         .eq("id", access.ordering_period_id)
         .eq("school_id", access.school_id)
         .maybeSingle(),
@@ -57,7 +57,6 @@ export default async function handler(req, res) {
         academic_year: period.academic_years,
         opens_at: period.opens_at,
         closes_at: period.closes_at,
-        class_required: period.class_required,
         delivery_note: period.delivery_note,
         open,
       },

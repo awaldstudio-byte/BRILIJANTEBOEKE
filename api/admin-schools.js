@@ -21,7 +21,7 @@ async function list(req, res) {
       database.from("grades").select("id, code, name, sort_order").order("sort_order"),
       database.from("books").select("id, grade_id, sku, title, default_price_cents, cover_path, active").eq("active", true),
       database.from("schools").select("id, slug, name, status, contact_name, contact_email, notes").order("name"),
-      database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, class_required, delivery_note"),
+      database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, delivery_note"),
       database.from("school_grade_offerings").select("id, school_id, ordering_period_id, grade_id, book_id, price_cents, expected_quantity, active"),
       database.from("school_access").select("id, school_id, ordering_period_id, label, code_hint, expires_at, revoked_at, last_used_at, created_at").is("revoked_at", null),
     ]);
@@ -85,7 +85,7 @@ async function save(req, res) {
       opens_at: input.period.opens_at,
       closes_at: input.period.closes_at,
       status: input.period.status,
-      class_required: input.period.class_required,
+      class_required: false,
       delivery_note: input.period.delivery_note || null,
     };
     let periodResult;
@@ -177,7 +177,7 @@ function validate(body) {
   const school = body?.school ?? {};
   const period = body?.period ?? {};
   const offerings = Array.isArray(body?.offerings) ? body.offerings : [];
-  if (offerings.length < 1 || offerings.length > 5) {
+  if (offerings.length < 1 || offerings.length > 7) {
     const error = new Error("Select at least one participating grade.");
     error.statusCode = 400;
     throw error;
@@ -207,7 +207,6 @@ function validate(body) {
       opens_at: opensAt,
       closes_at: closesAt,
       status: choice(period.status, ["draft", "open", "closed", "archived"], "Select a valid ordering status."),
-      class_required: Boolean(period.class_required),
       delivery_note: optionalText(period.delivery_note, 1_000),
     },
     offerings: offerings.map((item) => ({

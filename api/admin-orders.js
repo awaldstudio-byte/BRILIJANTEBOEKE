@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     let query = database
       .from("orders")
       .select(
-        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, class_name, grades(name))",
+        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name))",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })

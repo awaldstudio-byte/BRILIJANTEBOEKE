@@ -5,38 +5,38 @@ const locale = language === "en" ? "en-ZA" : "af-ZA";
 const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR" });
 const shortDate = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 const $ = (selector) => document.querySelector(selector);
-const state = { dashboard: null, progress: [], catalog: null, orders: [] };
+const state = { dashboard: null, progress: [], catalog: null, orders: [], batches: [] };
 
 const englishStatic = new Map([
   ["Administrasie", "Administration"], ["Teken uit", "Sign out"], ["INTERNE TOEGANG", "INTERNAL ACCESS"],
   ["Meld aan", "Sign in"], ["Gebruik die Briljante-administrasierekening.", "Use the Briljante administration account."],
   ["E-posadres", "Email address"], ["Wagwoord", "Password"], ["Oorsig", "Overview"],
-  ["Bestellings", "Orders"], ["Skole", "Schools"], ["Verslae", "Reports"], ["Interne toegang vir Briljante", "Internal access for Briljante"],
-  ["BRILJANTE ADMINISTRASIE", "BRILJANTE ADMINISTRATION"], ["VORDERING", "PROGRESS"],
+  ["Bestellings", "Orders"], ["Skole", "Schools"], ["Aflewering", "Fulfilment"], ["Verslae", "Reports"], ["Interne toegang vir Briljante Boeke", "Internal access for Briljante Boeke"],
+  ["BRILJANTE BOEKE ADMINISTRASIE", "BRILJANTE BOEKE ADMINISTRATION"], ["VORDERING", "PROGRESS"],
   ["Vordering", "Progress"],
   ["Bestellings per skool en graad", "Orders by school and grade"], ["Skool", "School"], ["Jaar", "Year"],
   ["Graad", "Grade"], ["Verwag", "Expected"], ["Betaal", "Paid"], ["Uitstaande", "Outstanding"],
   ["BESTELPERIODES", "ORDERING PERIODS"], ["Huidige periodes", "Current periods"], ["ONLANGS", "RECENT"],
   ["Onlangse bestellings", "Recent orders"], ["Sien alle bestellings", "View all orders"], ["Datum", "Date"],
   ["Verwysing", "Reference"], ["Ouer", "Parent"], ["Bedrag", "Amount"], ["Status", "Status"],
-  ["REKORDS", "RECORDS"], ["Laai betaalde leerderlys af", "Download paid learner list"],
+  ["REKORDS", "RECORDS"], ["Laai betaalde kinderlys af", "Download paid child list"],
   ["Alle statusse", "All statuses"], ["Wag vir betaling", "Pending payment"], ["Betaling onsuksesvol", "Payment failed"],
-  ["Gekanselleer", "Cancelled"], ["Alle skole", "All schools"], ["Filter", "Filter"], ["Leerders", "Children"],
+  ["Gekanselleer", "Cancelled"], ["Alle skole", "All schools"], ["Filter", "Filter"], ["Kinders", "Children"],
   ["Geen bestellings pas by die filter nie.", "No orders match the filter."], ["OPSTELLING", "SETUP"],
   ["Voeg skool by", "Add school"], ["Bestaande skole", "Existing schools"], ["SKOOL EN BESTELPERIODE", "SCHOOL AND ORDERING PERIOD"],
   ["Nuwe skool", "New school"], ["Skoolnaam", "School name"], ["Skakelfragment", "Link identifier"],
   ["Kontakpersoon", "Contact person"], ["Kontak-e-pos", "Contact email"], ["Akademiese jaar", "Academic year"],
   ["Naam van bestelperiode", "Ordering period name"], ["Open vanaf", "Opens on"], ["Sluit op", "Closes on"],
   ["Konsep", "Draft"], ["Oop", "Open"], ["Gesluit", "Closed"], ["Geargiveer", "Archived"],
-  ["Klas is verpligtend", "Class is required"], ["Afleweringsnota", "Delivery note"],
+  ["Afleweringsnota", "Delivery note"],
   ["Grade, pryse en verwagte hoeveelhede", "Grades, prices and expected quantities"],
   ["Genereer ’n nuwe private skoolkode en herroep die huidige kode", "Generate a new private school code and revoke the current code"],
   ["Stoor skoolopstelling", "Save school setup"], ["Nuwe private skooltoegang", "New private school access"],
   ["Toegangskode", "Access code"], ["Bestelskakel", "Order link"], ["Kopieer kode", "Copy code"],
   ["Kopieer skakel", "Copy link"], ["Berei e-pos voor", "Prepare email"],
   ["Die volledige kode en skakel word slegs een keer gewys. Genereer ’n nuwe kode indien dit verlore raak.", "The complete code and link are shown only once. Generate a new code if they are lost."],
-  ["VERSLAE", "REPORTS"], ["Betaalde leerderlyste", "Paid learner lists"],
-  ["Laai ’n CSV-lys af met die betaalde leerders, grade, klasse, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.", "Download a CSV containing paid children, grades, classes, parent details and order references. The list can be filtered by school or ordering period."],
+  ["VERSLAE", "REPORTS"], ["Betaalde kinderlyste", "Paid child lists"],
+  ["Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.", "Download a CSV containing paid children, grades, parent details and order references. The list can be filtered by school or ordering period."],
   ["Bestelperiode", "Ordering period"], ["Alle periodes", "All periods"], ["Laai CSV af", "Download CSV"],
 ]);
 
@@ -90,26 +90,28 @@ function showAdmin(staff) {
 }
 
 async function loadData() {
-  const [dashboard, progress, catalog, orders] = preview
-    ? [previewDashboard(), previewProgress(), previewCatalog(), previewOrders()]
-    : await Promise.all([api("/api/admin-dashboard"), api("/api/admin-progress"), api("/api/admin-schools"), api("/api/admin-orders")]);
+  const [dashboard, progress, catalog, orders, fulfilment] = preview
+    ? [previewDashboard(), previewProgress(), previewCatalog(), previewOrders(), previewFulfilment()]
+    : await Promise.all([api("/api/admin-dashboard"), api("/api/admin-progress"), api("/api/admin-schools"), api("/api/admin-orders"), api("/api/admin-fulfilment")]);
   state.dashboard = dashboard;
   state.progress = progress.progress;
   state.catalog = catalog;
   state.orders = orders.orders;
+  state.batches = fulfilment.batches;
   renderOverview();
   renderCatalog();
   renderOrders(state.orders);
+  renderFulfilment();
 }
 
 function renderOverview() {
   const summary = state.dashboard.summary;
   $("#metric-grid").innerHTML = [
-    [tr("Aktiewe skole", "Active schools"), summary.active_schools, tr("Huidige opstellings", "Current configurations"), ""],
-    [tr("Wag vir betaling", "Pending payment"), summary.pending_orders, tr("Nog nie deur PayFast bevestig nie", "Not yet confirmed by PayFast"), "attention"],
-    [tr("Betaalde bestellings", "Paid orders"), summary.paid_orders, tr("PayFast geverifieer", "Verified by PayFast"), "success"],
-    [tr("Betaalde waarde", "Paid value"), money.format(summary.paid_total_cents / 100), tr("Alle betaalde bestellings", "All paid orders"), ""],
-  ].map(([label, value, note, tone]) => `<article class="metric-card ${tone}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`).join("");
+    [tr("Aktiewe skole", "Active schools"), summary.active_schools, tr("Huidige opstellings", "Current configurations"), "", "schools"],
+    [tr("Wag vir betaling", "Pending payment"), summary.pending_orders, tr("Nog nie deur PayFast bevestig nie", "Not yet confirmed by PayFast"), "attention", "pending_payment"],
+    [tr("Betaalde bestellings", "Paid orders"), summary.paid_orders, tr("PayFast geverifieer", "Verified by PayFast"), "success", "paid"],
+    [tr("Betaalde waarde", "Paid value"), money.format(summary.paid_total_cents / 100), tr("Alle betaalde bestellings", "All paid orders"), "", "paid"],
+  ].map(([label, value, note, tone, target]) => `<button class="metric-card ${tone}" type="button" data-metric-target="${target}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></button>`).join("");
 
   $("#progress-rows").innerHTML = state.progress.map((item) => {
     const percentage = item.expected_quantity ? Math.min(100, Math.round(item.paid_quantity / item.expected_quantity * 100)) : 0;
@@ -155,6 +157,25 @@ function renderOrders(orders) {
   $("#orders-empty").hidden = orders.length > 0;
 }
 
+function renderFulfilment() {
+  const schoolSelect = $("#batch-form [name=school_id]");
+  const periodSelect = $("#batch-form [name=period_id]");
+  if (!schoolSelect || !periodSelect) return;
+  const selectedSchool = schoolSelect.value || state.catalog.schools[0]?.id || "";
+  schoolSelect.innerHTML = state.catalog.schools.map((school) => `<option value="${school.id}" ${school.id === selectedSchool ? "selected" : ""}>${escapeHtml(school.name)}</option>`).join("");
+  renderBatchPeriods();
+  $("#batch-list").innerHTML = state.batches.map((batch) => {
+    const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
+    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-batch-export?batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
+  }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
+}
+
+function renderBatchPeriods() {
+  const schoolId = $("#batch-form [name=school_id]").value;
+  const selected = $("#batch-form [name=period_id]").value;
+  $("#batch-form [name=period_id]").innerHTML = state.catalog.periods.filter((period) => period.school_id === schoolId).map((period) => `<option value="${period.id}" ${period.id === selected ? "selected" : ""}>${escapeHtml(localPeriod(period.name))} · ${escapeHtml(period.academic_year_id ? state.catalog.academic_years.find((year) => year.id === period.academic_year_id)?.year : "")}</option>`).join("");
+}
+
 function orderRow(order) {
   return `<tr><td>${shortDate.format(new Date(order.created_at))}</td><td>${escapeHtml(order.reference)}</td><td>${escapeHtml(order.schools?.name)}</td><td>${escapeHtml(order.parent_first_name)} ${escapeHtml(order.parent_last_name)}</td><td>${money.format(order.amount_cents / 100)}</td><td>${statusPill(order.status)}</td></tr>`;
 }
@@ -169,6 +190,14 @@ function statusPill(status) {
 
 document.querySelectorAll("[data-view]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.view)));
 document.querySelectorAll("[data-view-link]").forEach((button) => button.addEventListener("click", () => setView(button.dataset.viewLink)));
+$("#metric-grid").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-metric-target]");
+  if (!button) return;
+  if (button.dataset.metricTarget === "schools") return setView("schools");
+  setView("orders");
+  $("#order-filters [name=status]").value = button.dataset.metricTarget;
+  $("#order-filters").requestSubmit();
+});
 function setView(view) {
   document.querySelectorAll(".admin-view").forEach((section) => { section.hidden = section.id !== `view-${view}`; });
   document.querySelectorAll(".admin-nav [data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
@@ -194,6 +223,47 @@ $("#school-list").addEventListener("click", (event) => {
 });
 $("#new-school").addEventListener("click", resetSchoolForm);
 
+$("#batch-form [name=school_id]").addEventListener("change", renderBatchPeriods);
+$("#batch-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const message = $("#batch-message");
+  if (!confirm(tr("Skep ’n vaste afleweringsbatch vir hierdie skool? Latere betalings sal nie by hierdie batch gevoeg word nie.", "Create a fixed fulfilment batch for this school? Later payments will not be added to this batch."))) return;
+  const button = form.querySelector("button[type=submit]");
+  button.disabled = true;
+  message.textContent = "";
+  try {
+    if (preview) {
+      message.textContent = tr("Voorskoumodus: die voorbeeldbatch is gereed om af te laai.", "Preview mode: the example batch is ready to download.");
+      return;
+    }
+    const values = Object.fromEntries(new FormData(form));
+    const result = await api("/api/admin-fulfilment", { method: "POST", body: JSON.stringify(values) });
+    message.textContent = tr(`${result.batch.item_count} boeke is in die batch vasgelê.`, `${result.batch.item_count} books were captured in the batch.`);
+    state.batches = (await api("/api/admin-fulfilment")).batches;
+    renderFulfilment();
+  } catch (error) {
+    message.textContent = error.message;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+$("#batch-list").addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-batch-status]");
+  if (!select || preview) return;
+  const previous = state.batches.find((batch) => batch.id === select.dataset.batchStatus)?.status;
+  if (!confirm(tr("Werk die batchstatus op?", "Update the batch status?"))) { select.value = previous; return; }
+  try {
+    await api("/api/admin-fulfilment", { method: "PATCH", body: JSON.stringify({ id: select.dataset.batchStatus, status: select.value }) });
+    state.batches = (await api("/api/admin-fulfilment")).batches;
+    renderFulfilment();
+  } catch (error) {
+    alert(error.message);
+    select.value = previous;
+  }
+});
+
 function editSchool(schoolId) {
   const school = state.catalog.schools.find((item) => item.id === schoolId);
   const period = latestPeriod(schoolId);
@@ -209,7 +279,7 @@ function editSchool(schoolId) {
   form.opens_at.value = localDateTime(period?.opens_at);
   form.closes_at.value = localDateTime(period?.closes_at);
   form.period_status.value = period?.status ?? "draft";
-  form.class_required.checked = Boolean(period?.class_required);
+  form.class_required.checked = false;
   form.delivery_note.value = period?.delivery_note ?? "";
   form.replace_link.checked = false;
   $("#school-form-title").textContent = school.name;
@@ -261,7 +331,7 @@ $("#school-form").addEventListener("submit", async (event) => {
   const values = Object.fromEntries(new FormData(form));
   const payload = {
     school: { id: values.school_id || null, name: values.school_name, slug: values.school_slug, status: "active", contact_name: values.contact_name, contact_email: values.contact_email, notes: "" },
-    period: { id: values.period_id || null, academic_year_id: values.academic_year_id, name: values.period_name, opens_at: new Date(values.opens_at).toISOString(), closes_at: new Date(values.closes_at).toISOString(), status: values.period_status, class_required: form.class_required.checked, delivery_note: values.delivery_note },
+    period: { id: values.period_id || null, academic_year_id: values.academic_year_id, name: values.period_name, opens_at: new Date(values.opens_at).toISOString(), closes_at: new Date(values.closes_at).toISOString(), status: values.period_status, class_required: false, delivery_note: values.delivery_note },
     offerings,
     replace_link: form.replace_link.checked,
   };
@@ -368,6 +438,13 @@ function localStatus(value) {
   return labels[value] ?? value;
 }
 
+function localFulfilmentStatus(value) {
+  const labels = language === "en"
+    ? { created: "Created", packing: "Packing", ready: "Ready", dispatched: "Dispatched", delivered: "Delivered", cancelled: "Cancelled" }
+    : { created: "Geskep", packing: "Verpak", ready: "Gereed", dispatched: "Versend", delivered: "Afgelewer", cancelled: "Gekanselleer" };
+  return labels[value] ?? value;
+}
+
 function previewDashboard() {
   return { summary: { active_schools: 3, pending_orders: 18, paid_orders: 132, paid_total_cents: 4488000 }, periods: [{ name: "Ouersbestellings", status: "open", closes_at: "2026-10-31T21:59:59Z", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, academic_years: { year: 2027 } }], recent_orders: previewOrders().orders.slice(0, 4) };
 }
@@ -384,4 +461,19 @@ function previewCatalog() {
 function previewOrders() {
   const base = { school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { name: "Ouersbestellings", academic_years: { year: 2027 } } };
   return { orders: [{ ...base, id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] }, { ...base, id: "2", reference: "BB-26-42C81A9E", amount_cents: 34000, status: "pending_payment", parent_first_name: "Pieter", parent_last_name: "Botha", parent_email: "pieter@example.com", created_at: "2026-09-16T09:15:00Z", learners: [{ first_name: "Lea", last_name: "Botha", grades: { name: "Graad 4" } }] }] };
+}
+
+function previewFulfilment() {
+  return {
+    batches: [{
+      id: "30000000-0000-4000-8000-000000000001",
+      school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645",
+      ordering_period_id: "a3290cc2-a98d-42d6-af04-47041be75e2",
+      label: tr("Oktober 2026", "October 2026"),
+      status: "packing",
+      schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") },
+      ordering_periods: { academic_years: { year: 2027 } },
+      fulfilment_batch_items: [{ count: 74 }],
+    }],
+  };
 }

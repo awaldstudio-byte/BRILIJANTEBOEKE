@@ -27,14 +27,14 @@ const englishStatic = new Map([
   ["Hierdie skoolskakel is nie beskikbaar nie", "This school link is unavailable"],
   ["Kontroleer asseblief die skakel wat deur die skool verskaf is.", "Check the link or access code supplied by the school."],
   ["Bestel werkboeke", "Order workbooks"],
-  ["Kies die toepaslike werkboek vir elke leerder. Meer as een kind van dieselfde skool kan in een betaling ingesluit word.", "Choose the correct workbook for each child. More than one child from the same school can be included in one payment."],
-  ["Leerders", "Children"],
+  ["Kies die toepaslike werkboek vir elke kind. Meer as een kind van dieselfde skool kan in een betaling ingesluit word.", "Choose the correct workbook for each child. More than one child from the same school can be included in one payment."],
+  ["Kinders", "Children"],
   ["Besonderhede", "Details"],
   ["Hersien en betaal", "Review and pay"],
   ["BESKIKBAAR VIR HIERDIE SKOOL", "AVAILABLE FOR THIS SCHOOL"],
   ["Werkboeke", "Workbooks"],
   ["HUIDIGE BESTELLING", "CURRENT ORDER"],
-  ["Voeg nog ’n leerder by", "Add another child"],
+  ["Voeg nog ’n kind by", "Add another child"],
   ["Totaal", "Total"],
   ["OUERBESONDERHEDE", "PARENT DETAILS"],
   ["Kontakbesonderhede", "Contact details"],
@@ -102,7 +102,7 @@ function renderBooks() {
         <div class="book-copy">
           <h3>${escapeHtml(localBook(item.book.title))}</h3>
           <strong>${money.format(item.price_cents / 100)}</strong>
-          <button class="btn ${selected ? "btn-primary" : "btn-outline"} btn-full" data-select-offering="${item.id}" type="button" aria-pressed="${selected}">${selected ? tr("Gekies", "Selected") : tr("Kies vir geselekteerde leerder", "Choose for selected child")}</button>
+          <button class="btn ${selected ? "btn-primary" : "btn-outline"} btn-full" data-select-offering="${item.id}" type="button" aria-pressed="${selected}">${selected ? tr("Gekies", "Selected") : tr("Kies vir geselekteerde kind", "Choose for selected child")}</button>
         </div>
       </article>`;
   }).join("");
@@ -112,13 +112,12 @@ function renderLearners() {
   $("#learner-count").textContent = String(state.learners.length);
   $("#learner-list").innerHTML = state.learners.map((learner, index) => `
     <article class="learner-card ${learner.id === state.activeLearnerId ? "active" : ""}" data-learner-id="${learner.id}">
-      <div class="learner-heading"><strong>${tr("Leerder", "Child")} ${index + 1}</strong><button data-remove-learner="${learner.id}" type="button" ${state.learners.length === 1 ? "disabled" : ""}>${tr("Verwyder", "Remove")}</button></div>
+      <div class="learner-heading"><strong>${tr("Kind", "Child")} ${index + 1}</strong><button data-remove-learner="${learner.id}" type="button" ${state.learners.length === 1 ? "disabled" : ""}>${tr("Verwyder", "Remove")}</button></div>
       <div class="field-pair">
         <label>${tr("Naam", "First name")}<input data-field="first_name" value="${escapeAttribute(learner.first_name)}" required minlength="2" maxlength="100" autocomplete="off" /></label>
         <label>${tr("Van", "Surname")}<input data-field="last_name" value="${escapeAttribute(learner.last_name)}" required minlength="2" maxlength="100" autocomplete="off" /></label>
       </div>
       <label>${tr("Graad", "Grade")}<select data-field="offering_id" required>${offeringOptions(learner.offering_id)}</select></label>
-      <label>${tr("Klas", "Class")} ${state.config.period.class_required ? "" : `<small>(${tr("opsioneel", "optional")})</small>`}<input data-field="class_name" value="${escapeAttribute(learner.class_name)}" ${state.config.period.class_required ? "required" : ""} maxlength="30" placeholder="${tr("bv. 3A", "e.g. 3A")}" autocomplete="off" /></label>
     </article>
   `).join("");
   updateTotal();
@@ -167,7 +166,7 @@ function addLearner() {
 }
 
 function newLearner(offeringId) {
-  return { id: crypto.randomUUID(), first_name: "", last_name: "", offering_id: offeringId, class_name: "" };
+  return { id: crypto.randomUUID(), first_name: "", last_name: "", offering_id: offeringId };
 }
 
 function offering(id) {
@@ -235,7 +234,7 @@ $("#continue-details").addEventListener("click", () => {
   const invalid = fields.find((field) => !field.checkValidity());
   if (invalid) {
     invalid.reportValidity();
-    $("#learner-error").textContent = tr("Voltooi asseblief die besonderhede vir elke leerder.", "Complete the details for each child.");
+    $("#learner-error").textContent = tr("Voltooi asseblief die besonderhede vir elke kind.", "Complete the details for each child.");
     return;
   }
   $("#learner-error").textContent = "";
