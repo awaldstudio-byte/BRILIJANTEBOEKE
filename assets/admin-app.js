@@ -38,6 +38,9 @@ const englishStatic = new Map([
   ["VERSLAE", "REPORTS"], ["Betaalde kinderlyste", "Paid child lists"],
   ["Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.", "Download a CSV containing paid children, grades, parent details and order references. The list can be filtered by school or ordering period."],
   ["Bestelperiode", "Ordering period"], ["Alle periodes", "All periods"], ["Laai CSV af", "Download CSV"],
+  ["AFLEWERING", "FULFILMENT"], ["Skoolbestellings", "School orders"],
+  ["Skep ’n afleweringsbatch vir een skool op ’n slag. Slegs betaalde boeke wat nog nie in ’n batch is nie, word ingesluit. Latere betalings bly beskikbaar vir die volgende batch.", "Create a fulfilment batch for one school at a time. Only paid books not already in a batch are included. Later payments remain available for the next batch."],
+  ["Skep batch", "Create batch"], ["Batchnaam", "Batch name"], ["Skep afleweringsbatch", "Create fulfilment batch"], ["Bestaande batches", "Existing batches"],
 ]);
 
 applyLanguage();
@@ -166,7 +169,7 @@ function renderFulfilment() {
   renderBatchPeriods();
   $("#batch-list").innerHTML = state.batches.map((batch) => {
     const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
-    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-batch-export?batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
+    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-batch-export?batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
 }
 
@@ -208,7 +211,7 @@ $("#order-filters").addEventListener("submit", async (event) => {
   event.preventDefault();
   const params = new URLSearchParams(Object.fromEntries([...new FormData(event.currentTarget)].filter(([, value]) => value)));
   try {
-    const result = preview ? { orders: previewOrders().orders } : await api(`/api/admin-orders?${params}`);
+    const result = preview ? { orders: filterPreviewOrders(params) } : await api(`/api/admin-orders?${params}`);
     state.orders = result.orders;
     renderOrders(result.orders);
   } catch (error) {
@@ -461,6 +464,15 @@ function previewCatalog() {
 function previewOrders() {
   const base = { school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { name: "Ouersbestellings", academic_years: { year: 2027 } } };
   return { orders: [{ ...base, id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] }, { ...base, id: "2", reference: "BB-26-42C81A9E", amount_cents: 34000, status: "pending_payment", parent_first_name: "Pieter", parent_last_name: "Botha", parent_email: "pieter@example.com", created_at: "2026-09-16T09:15:00Z", learners: [{ first_name: "Lea", last_name: "Botha", grades: { name: "Graad 4" } }] }] };
+}
+
+function filterPreviewOrders(params) {
+  return previewOrders().orders.filter((order) => {
+    if (params.get("status") && order.status !== params.get("status")) return false;
+    if (params.get("school_id") && order.school_id !== params.get("school_id")) return false;
+    const search = params.get("search")?.toLowerCase();
+    return !search || [order.reference, order.parent_last_name, order.parent_email].some((value) => value.toLowerCase().includes(search));
+  });
 }
 
 function previewFulfilment() {
