@@ -36,7 +36,7 @@
         </section>
 
         <section id="view-orders" class="admin-view" hidden>
-          <div class="admin-title"><div><p class="phase-label">REKORDS</p><h1>Bestellings</h1></div><a id="orders-export" class="btn btn-outline" href="/api/admin-paid-export">Laai betaalde kinderlys af</a></div>
+          <div class="admin-title"><div><p class="phase-label">REKORDS</p><h1>Bestellings</h1></div><a id="orders-export" class="btn btn-outline" href="/api/admin-export">Laai betaalde kinderlys af</a></div>
           <form id="order-filters" class="filter-bar"><input name="search" placeholder="Verwysing, van of e-pos" /><select name="status"><option value="">Alle statusse</option><option value="pending_payment">Wag vir betaling</option><option value="paid">Betaal</option><option value="payment_failed">Betaling onsuksesvol</option><option value="cancelled">Gekanselleer</option></select><select name="school_id"><option value="">Alle skole</option></select><button class="btn btn-primary" type="submit">Filter</button></form>
           <article class="data-card"><div class="table-wrap"><table><thead><tr><th>Datum</th><th>Verwysing</th><th>Skool</th><th>Kinders</th><th>Ouer</th><th>Bedrag</th><th>Status</th></tr></thead><tbody id="all-order-rows"></tbody></table></div><p id="orders-empty" class="empty-state" hidden>Geen bestellings pas by die filter nie.</p></article>
         </section>
@@ -54,7 +54,7 @@
 
         <section id="view-reports" class="admin-view" hidden>
           <div class="admin-title"><div><p class="phase-label">VERSLAE</p><h1>Betaalde kinderlyste</h1></div></div>
-          <article class="data-card report-card"><p>Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.</p><div class="field-pair"><label>Skool<select id="report-school"><option value="">Alle skole</option></select></label><label>Bestelperiode<select id="report-period"><option value="">Alle periodes</option></select></label></div><a id="report-download" class="btn btn-primary" href="/api/admin-paid-export">Laai CSV af</a></article>
+          <article class="data-card report-card"><p>Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.</p><div class="field-pair"><label>Skool<select id="report-school"><option value="">Alle skole</option></select></label><label>Bestelperiode<select id="report-period"><option value="">Alle periodes</option></select></label></div><a id="report-download" class="btn btn-primary" href="/api/admin-export">Laai CSV af</a></article>
         </section>
       </main>
     </div>

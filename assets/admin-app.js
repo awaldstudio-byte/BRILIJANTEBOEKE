@@ -80,7 +80,7 @@ $("#login-form").addEventListener("submit", async (event) => {
 });
 
 $("#logout-button").addEventListener("click", async () => {
-  if (!preview) await api("/api/admin-logout", { method: "POST", body: "{}" }).catch(() => {});
+  if (!preview) await api("/api/admin-login", { method: "DELETE", body: "{}" }).catch(() => {});
   location.href = `/admin/?lang=${language}`;
 });
 
@@ -93,11 +93,11 @@ function showAdmin(staff) {
 }
 
 async function loadData() {
-  const [dashboard, progress, catalog, orders, fulfilment] = preview
-    ? [previewDashboard(), previewProgress(), previewCatalog(), previewOrders(), previewFulfilment()]
-    : await Promise.all([api("/api/admin-dashboard"), api("/api/admin-progress"), api("/api/admin-schools"), api("/api/admin-orders"), api("/api/admin-fulfilment")]);
+  const [dashboard, catalog, orders, fulfilment] = preview
+    ? [previewDashboard(), previewCatalog(), previewOrders(), previewFulfilment()]
+    : await Promise.all([api("/api/admin-dashboard"), api("/api/admin-schools"), api("/api/admin-orders"), api("/api/admin-fulfilment")]);
   state.dashboard = dashboard;
-  state.progress = progress.progress;
+  state.progress = preview ? previewProgress().progress : dashboard.progress;
   state.catalog = catalog;
   state.orders = orders.orders;
   state.batches = fulfilment.batches;
@@ -169,7 +169,7 @@ function renderFulfilment() {
   renderBatchPeriods();
   $("#batch-list").innerHTML = state.batches.map((batch) => {
     const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
-    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-batch-export?batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
+    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
 }
 
@@ -364,7 +364,7 @@ function updateReportLink() {
   const params = new URLSearchParams();
   if ($("#report-school").value) params.set("school_id", $("#report-school").value);
   if ($("#report-period").value) params.set("period_id", $("#report-period").value);
-  $("#report-download").href = `/api/admin-paid-export?${params}`;
+  $("#report-download").href = `/api/admin-export?${params}`;
 }
 
 function showGeneratedAccess(result, contactEmail, schoolName) {

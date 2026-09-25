@@ -1,13 +1,17 @@
-import { requireSameOrigin, setSessionCookies } from "./_lib/auth.js";
+import { clearSessionCookies, requireSameOrigin, setSessionCookies } from "./_lib/auth.js";
 import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, publicAuthClient, serviceClient } from "./_lib/supabase.js";
 import { text } from "./_lib/validation.js";
 
 export default async function handler(req, res) {
-  if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
+  if (!["POST", "DELETE"].includes(req.method)) return methodNotAllowed(res, ["POST", "DELETE"]);
 
   try {
     requireSameOrigin(req);
+    if (req.method === "DELETE") {
+      clearSessionCookies(res);
+      return json(res, 200, { ok: true });
+    }
     const body = await readJson(req, 8_000);
     const email = text(body.email, 5, 254, "Enter a valid email address.").toLowerCase();
     const password = text(body.password, 8, 200, "Enter your password.");
