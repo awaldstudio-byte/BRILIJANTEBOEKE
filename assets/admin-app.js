@@ -455,22 +455,87 @@ function localFulfilmentStatus(value) {
 }
 
 function previewDashboard() {
-  return { summary: { active_schools: 3, pending_orders: 18, paid_orders: 132, paid_total_cents: 4488000 }, periods: [{ name: "Ouersbestellings", status: "open", closes_at: "2026-10-31T21:59:59Z", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, academic_years: { year: 2027 } }], recent_orders: previewOrders().orders.slice(0, 4) };
+  const catalog = previewCatalog();
+  const orders = previewOrders().orders;
+  const paid = orders.filter((order) => order.status === "paid");
+  return {
+    summary: {
+      active_schools: catalog.schools.filter((school) => school.status === "active").length,
+      pending_orders: orders.filter((order) => order.status === "pending_payment").length,
+      paid_orders: paid.length,
+      paid_total_cents: paid.reduce((total, order) => total + order.amount_cents, 0),
+    },
+    periods: catalog.periods.map((period) => ({
+      ...period,
+      schools: { name: catalog.schools.find((school) => school.id === period.school_id)?.name },
+      academic_years: { year: 2027 },
+    })),
+    recent_orders: orders.slice(0, 4),
+  };
 }
 function previewProgress() {
-  return { progress: [{ id: "o1", expected_quantity: 90, paid_quantity: 74, remaining_quantity: 16, schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { academic_years: { year: 2027 } }, grades: { name: "Graad 3" } }, { id: "o2", expected_quantity: 80, paid_quantity: 58, remaining_quantity: 22, schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { academic_years: { year: 2027 } }, grades: { name: "Graad 4" } }] };
+  const catalog = previewCatalog();
+  const paidOrders = previewOrders().orders.filter((order) => order.status === "paid");
+  return {
+    progress: catalog.offerings.map((offering) => {
+      const grade = catalog.grades.find((item) => item.id === offering.grade_id);
+      const paidQuantity = paidOrders
+        .filter((order) => order.school_id === offering.school_id)
+        .flatMap((order) => order.learners)
+        .filter((learner) => learner.grades?.name === grade.name)
+        .length;
+      return {
+        ...offering,
+        paid_quantity: paidQuantity,
+        remaining_quantity: Math.max(0, offering.expected_quantity - paidQuantity),
+        schools: { name: catalog.schools.find((school) => school.id === offering.school_id)?.name },
+        ordering_periods: { academic_years: { year: 2027 } },
+        grades: { name: grade.name },
+      };
+    }),
+  };
 }
 function previewCatalog() {
   const schoolId = "7f7e51d9-6464-4cd0-8250-3b946011b645";
+  const secondSchoolId = "7172ae6a-dc5a-4381-b536-20ccf697a403";
+  const thirdSchoolId = "ec5bb475-3953-43b8-a385-3976ed9dcd01";
   const periodId = "a3290cc2-a98d-42d6-af04-47041be75e2b";
+  const secondPeriodId = "b3b9cb89-ef0c-456a-84e0-2b6307c8cc9e";
+  const thirdPeriodId = "dbf84846-094d-4b9e-a09a-f9e2e12b8c6b";
   const grades = [{ id: "b748a5f4-b1d8-4f85-8bb8-2c157da1b8e1", name: "Graad 1", sort_order: 1 }, { id: "f8a60f45-23e4-4fdc-8a2d-bf30cba2b1f6", name: "Graad 2", sort_order: 2 }, { id: "5dc50b47-660a-4ff4-8532-a245188ec803", name: "Graad 3", sort_order: 3 }, { id: "dfc52037-530e-436e-9703-c1d80288aee3", name: "Graad 4", sort_order: 4 }, { id: "0b65911f-171c-49f3-8ea5-1b15596fe76b", name: "Graad 5", sort_order: 5 }, { id: "2cd27b9c-b343-42d9-888d-300934eaa181", name: "Graad 6", sort_order: 6 }, { id: "35827cbc-2e68-4dd3-8815-786e3f953739", name: "Graad 7", sort_order: 7 }];
   const books = grades.map((grade, index) => ({ id: `00000000-0000-4000-8000-00000000000${index}`, grade_id: grade.id, title: `${grade.name} Werkboek`, default_price_cents: index === 2 ? 32000 : 34000, active: index > 1 }));
-  const configuredGrades = grades.slice(2, 5);
-  return { academic_years: [{ id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", year: 2027, label: "2027 Academic Year", is_active: true }], grades, books, schools: [{ id: schoolId, name: tr("Laerskool Voorbeeld", "Example Primary School"), slug: "laerskool-voorbeeld", status: "active", contact_name: "", contact_email: "" }], periods: [{ id: periodId, school_id: schoolId, academic_year_id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", name: "Ouersbestellings", opens_at: "2026-09-01T00:00:00+02:00", closes_at: "2026-10-31T23:59:59+02:00", status: "open", class_required: false, delivery_note: tr("Boeke word in grootmaat afgelewer.", "Books are delivered in bulk.") }], offerings: configuredGrades.map((grade, index) => ({ id: `10000000-0000-4000-8000-00000000000${index}`, school_id: schoolId, ordering_period_id: periodId, grade_id: grade.id, book_id: books.find((book) => book.grade_id === grade.id).id, price_cents: index ? 34000 : 32000, expected_quantity: 90 - index * 10, active: true })), access_links: [{ id: "20000000-0000-4000-8000-000000000001", school_id: schoolId, ordering_period_id: periodId, code_hint: "2027" }] };
+  const configurations = [
+    { id: schoolId, name: tr("Laerskool Voorbeeld", "Example Primary School"), slug: "laerskool-voorbeeld", periodId, periodName: tr("Ouersbestellings", "Parent orders"), closesAt: "2026-10-31T23:59:59+02:00", grades: ["3", "4", "5"], expected: [90, 80, 70], codeHint: "2027" },
+    { id: secondSchoolId, name: tr("Bergsig Laerskool", "Bergsig Primary School"), slug: "bergsig-laerskool", periodId: secondPeriodId, periodName: tr("2027 Bestellings", "2027 orders"), closesAt: "2026-11-15T23:59:59+02:00", grades: ["4", "5", "6"], expected: [74, 68, 62], codeHint: "BGS7" },
+    { id: thirdSchoolId, name: tr("Laerskool Môrester", "Morning Star Primary School"), slug: "laerskool-morester", periodId: thirdPeriodId, periodName: tr("Eindjaarbestellings", "Year-end orders"), closesAt: "2026-11-30T23:59:59+02:00", grades: ["3", "6", "7"], expected: [55, 50, 46], codeHint: "MRS7" },
+  ];
+  const schools = configurations.map((item) => ({ id: item.id, name: item.name, slug: item.slug, status: "active", contact_name: "", contact_email: "" }));
+  const periods = configurations.map((item) => ({ id: item.periodId, school_id: item.id, academic_year_id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", name: item.periodName, opens_at: "2026-09-01T00:00:00+02:00", closes_at: item.closesAt, status: "open", class_required: false, delivery_note: tr("Boeke word in grootmaat afgelewer.", "Books are delivered in bulk.") }));
+  const offerings = configurations.flatMap((school, schoolIndex) => school.grades.map((code, gradeIndex) => {
+    const grade = grades.find((item) => item.name === `Graad ${code}`);
+    const book = books.find((item) => item.grade_id === grade.id);
+    return { id: `10000000-0000-400${schoolIndex}-8000-0000000000${gradeIndex + 10}`, school_id: school.id, ordering_period_id: school.periodId, grade_id: grade.id, book_id: book.id, price_cents: code === "3" ? 32000 : 34000, expected_quantity: school.expected[gradeIndex], active: true };
+  }));
+  const access_links = configurations.map((school, index) => ({ id: `20000000-0000-4000-8000-00000000000${index + 1}`, school_id: school.id, ordering_period_id: school.periodId, code_hint: school.codeHint }));
+  return { academic_years: [{ id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", year: 2027, label: "2027 Academic Year", is_active: true }], grades, books, schools, periods, offerings, access_links };
 }
 function previewOrders() {
-  const base = { school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { name: "Ouersbestellings", academic_years: { year: 2027 } } };
-  return { orders: [{ ...base, id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] }, { ...base, id: "2", reference: "BB-26-42C81A9E", amount_cents: 34000, status: "pending_payment", parent_first_name: "Pieter", parent_last_name: "Botha", parent_email: "pieter@example.com", created_at: "2026-09-16T09:15:00Z", learners: [{ first_name: "Lea", last_name: "Botha", grades: { name: "Graad 4" } }] }] };
+  const catalog = previewCatalog();
+  const base = (index) => {
+    const school = catalog.schools[index];
+    const period = catalog.periods.find((item) => item.school_id === school.id);
+    return { school_id: school.id, schools: { name: school.name }, ordering_periods: { name: period.name, academic_years: { year: 2027 } } };
+  };
+  return { orders: [
+    { ...base(2), id: "8", reference: "BB-26-CE8A3910", amount_cents: 32000, status: "pending_payment", parent_first_name: "Carla", parent_last_name: "Nel", parent_email: "carla.nel@example.com", created_at: "2026-09-18T10:20:00Z", learners: [{ first_name: "Jana", last_name: "Nel", grades: { name: "Graad 3" } }] },
+    { ...base(2), id: "7", reference: "BB-26-3D87B6A9", amount_cents: 34000, status: "paid", parent_first_name: "Megan", parent_last_name: "Smit", parent_email: "megan.smit@example.com", created_at: "2026-09-18T08:45:00Z", learners: [{ first_name: "Aiden", last_name: "Smit", grades: { name: "Graad 6" } }] },
+    { ...base(2), id: "6", reference: "BB-26-A19F427C", amount_cents: 66000, status: "paid", parent_first_name: "Thandi", parent_last_name: "Mokoena", parent_email: "thandi.mokoena@example.com", created_at: "2026-09-17T14:10:00Z", learners: [{ first_name: "Lebo", last_name: "Mokoena", grades: { name: "Graad 3" } }, { first_name: "Kea", last_name: "Mokoena", grades: { name: "Graad 7" } }] },
+    { ...base(1), id: "5", reference: "BB-26-D55E813B", amount_cents: 34000, status: "pending_payment", parent_first_name: "Johan", parent_last_name: "Fourie", parent_email: "johan.fourie@example.com", created_at: "2026-09-17T11:05:00Z", learners: [{ first_name: "Noah", last_name: "Fourie", grades: { name: "Graad 5" } }] },
+    { ...base(1), id: "4", reference: "BB-26-60F2ACD1", amount_cents: 68000, status: "paid", parent_first_name: "Rene", parent_last_name: "Bothma", parent_email: "rene.bothma@example.com", created_at: "2026-09-17T09:20:00Z", learners: [{ first_name: "Emma", last_name: "Bothma", grades: { name: "Graad 5" } }, { first_name: "Luca", last_name: "Bothma", grades: { name: "Graad 6" } }] },
+    { ...base(1), id: "3", reference: "BB-26-B0A83F61", amount_cents: 34000, status: "paid", parent_first_name: "Karin", parent_last_name: "Venter", parent_email: "karin.venter@example.com", created_at: "2026-09-16T13:35:00Z", learners: [{ first_name: "Zoe", last_name: "Venter", grades: { name: "Graad 4" } }] },
+    { ...base(0), id: "2", reference: "BB-26-42C81A9E", amount_cents: 34000, status: "pending_payment", parent_first_name: "Pieter", parent_last_name: "Botha", parent_email: "pieter@example.com", created_at: "2026-09-16T09:15:00Z", learners: [{ first_name: "Lea", last_name: "Botha", grades: { name: "Graad 4" } }] },
+    { ...base(0), id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] },
+  ] };
 }
 
 function filterPreviewOrders(params) {
@@ -483,16 +548,19 @@ function filterPreviewOrders(params) {
 }
 
 function previewFulfilment() {
+  const catalog = previewCatalog();
+  const paidOrders = previewOrders().orders.filter((order) => order.status === "paid");
+  const statuses = ["packing", "created", "ready"];
   return {
-    batches: [{
-      id: "30000000-0000-4000-8000-000000000001",
-      school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645",
-      ordering_period_id: "a3290cc2-a98d-42d6-af04-47041be75e2",
-      label: tr("Oktober 2026", "October 2026"),
-      status: "packing",
-      schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") },
+    batches: catalog.schools.map((school, index) => ({
+      id: `30000000-0000-4000-8000-00000000000${index + 1}`,
+      school_id: school.id,
+      ordering_period_id: catalog.periods.find((period) => period.school_id === school.id).id,
+      label: tr("2027 Bestelbatch", "2027 order batch"),
+      status: statuses[index],
+      schools: { name: school.name },
       ordering_periods: { academic_years: { year: 2027 } },
-      fulfilment_batch_items: [{ count: 74 }],
-    }],
+      fulfilment_batch_items: [{ count: paidOrders.filter((order) => order.school_id === school.id).flatMap((order) => order.learners).length }],
+    })),
   };
 }
