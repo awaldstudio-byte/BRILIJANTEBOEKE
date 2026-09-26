@@ -11,6 +11,9 @@ export function validateOrderInput(body) {
   const email = text(parent.email, 5, 254, "Enter a valid email address.").toLowerCase();
   if (!emailPattern.test(email)) throw badRequest("Enter a valid email address.");
   const mobile = text(parent.mobile, 7, 30, "Enter a valid mobile number.");
+  const consent = body.consent ?? {};
+  if (consent.accepted !== true) throw badRequest("Accept the terms and privacy policy before continuing.");
+  const policyVersion = text(consent.policy_version, 8, 64, "The policy acknowledgement is invalid.");
 
   if (!Array.isArray(body.learners) || body.learners.length < 1 || body.learners.length > 10) {
     throw badRequest("Add between one and ten learners.");
@@ -26,6 +29,7 @@ export function validateOrderInput(body) {
     schoolToken,
     idempotencyKey,
     parent: { first_name: firstName, last_name: lastName, email, mobile },
+    consent: { accepted: true, policy_version: policyVersion },
     learners,
   };
 }

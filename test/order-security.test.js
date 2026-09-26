@@ -16,6 +16,7 @@ test("order input accepts multiple learners and rejects malformed offerings", ()
     school_token: "school-token-with-sufficient-length",
     request_id: "550e8400-e29b-41d4-a716-446655440000",
     parent: { first_name: "Annelie", last_name: "Jacobs", email: "annelie@example.com", mobile: "0825550123" },
+    consent: { accepted: true, policy_version: "2026-09-26" },
     learners: [
       { first_name: "Mia", last_name: "Jacobs", offering_id: "2de1d6a7-02b5-41e0-b9ee-b276c4d65041", class_name: "3A" },
       { first_name: "Liam", last_name: "Jacobs", offering_id: "ec3e1131-5fe0-4516-bc90-2f1b2757d15c", class_name: "5B" },
@@ -26,6 +27,7 @@ test("order input accepts multiple learners and rejects malformed offerings", ()
     school_token: input.schoolToken,
     request_id: input.idempotencyKey,
     parent: input.parent,
+    consent: input.consent,
     learners: [{ ...input.learners[0], offering_id: "not-a-uuid" }],
   }), /available grade/i);
 });
@@ -35,6 +37,7 @@ test("order input accepts a generated school access code but rejects undersized 
     school_token: "ABCDE-23456",
     request_id: "550e8400-e29b-41d4-a716-446655440000",
     parent: { first_name: "Annelie", last_name: "Jacobs", email: "annelie@example.com", mobile: "0825550123" },
+    consent: { accepted: true, policy_version: "2026-09-26" },
     learners: [
       { first_name: "Mia", last_name: "Jacobs", offering_id: "2de1d6a7-02b5-41e0-b9ee-b276c4d65041", class_name: "3A" },
     ],
@@ -42,6 +45,7 @@ test("order input accepts a generated school access code but rejects undersized 
 
   assert.equal(validateOrderInput(base).schoolToken, "ABCDE-23456");
   assert.throws(() => validateOrderInput({ ...base, school_token: "ABC-123" }), /school link/i);
+  assert.throws(() => validateOrderInput({ ...base, consent: { accepted: false, policy_version: "2026-09-26" } }), /Accept the terms/i);
 });
 
 test("database migration locks every Phase 1 table behind RLS and service access", async () => {

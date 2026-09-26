@@ -16,7 +16,7 @@ export default async function handler(req, res) {
       p_token_hash: sha256(input.schoolToken),
       p_idempotency_key: input.idempotencyKey,
       p_order_access_hash: sha256(orderToken),
-      p_parent: input.parent,
+      p_parent: { ...input.parent, consent: input.consent },
       p_learners: input.learners,
     });
     assertDatabaseResult(error);
@@ -36,6 +36,7 @@ export default async function handler(req, res) {
       CLASS_REQUIRED: "Enter the class for each learner.",
       LEARNER_DETAILS_INVALID: "Check the learner details and try again.",
       PARENT_DETAILS_INVALID: "Check the parent details and try again.",
+      CONSENT_REQUIRED: "Accept the terms and privacy policy before continuing.",
     };
     if (known[error.message]) error = Object.assign(new Error(known[error.message]), { statusCode: 400 });
     else console.error("orders", { code: error.code, message: error.message });

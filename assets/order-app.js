@@ -2,6 +2,7 @@ const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const schoolToken = query.get("school") ?? query.get("code") ?? "";
 const preview = query.get("preview") === "1";
+const policyVersion = "2026-09-26";
 const locale = language === "en" ? "en-ZA" : "af-ZA";
 const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR" });
 const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" });
@@ -12,6 +13,7 @@ const state = {
   learners: [],
   activeLearnerId: null,
   parent: null,
+  consent: null,
   config: null,
   order: null,
 };
@@ -42,10 +44,10 @@ const englishStatic = new Map([
   ["Van", "Surname"],
   ["E-posadres", "Email address"],
   ["Selfoonnommer", "Mobile number"],
-  ["Ek bevestig dat die besonderhede korrek is en aanvaar die", "I confirm that the details are correct and accept the"],
+  ["Ek bevestig dat die besonderhede korrek is, dat ek die", "I confirm that the details are correct and that I have read the"],
   ["privaatheidsbeleid", "privacy policy"],
-  ["en", "and"],
-  ["bepalings", "terms"],
+  ["gelees het, en dat ek die", "and accept the"],
+  ["bestel-, aflewerings- en terugbetalingsbepalings", "order, delivery and returns terms"],
   ["Terug", "Back"],
   ["Hersien bestelling", "Review order"],
   ["BESTELLING", "ORDER"],
@@ -246,6 +248,7 @@ $("#parent-form").addEventListener("submit", (event) => {
   if (!event.currentTarget.reportValidity()) return;
   const data = new FormData(event.currentTarget);
   state.parent = { first_name: data.get("first_name"), last_name: data.get("last_name"), email: data.get("email"), mobile: data.get("mobile") };
+  state.consent = { accepted: data.get("consent") === "on", policy_version: policyVersion };
   setStep(3);
 });
 
@@ -264,7 +267,7 @@ async function startPayment() {
   message.textContent = "";
   try {
     if (!state.order) {
-      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ school_token: schoolToken, request_id: state.requestId, parent: state.parent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
+      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ school_token: schoolToken, request_id: state.requestId, parent: state.parent, consent: state.consent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
       state.order = result.order;
       sessionStorage.setItem(`briljante_order_token_${state.order.reference}`, state.order.access_token);
     }
