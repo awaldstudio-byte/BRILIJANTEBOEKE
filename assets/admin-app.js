@@ -30,6 +30,7 @@ const englishStatic = new Map([
   ["Konsep", "Draft"], ["Oop", "Open"], ["Gesluit", "Closed"], ["Geargiveer", "Archived"],
   ["Afleweringsnota", "Delivery note"],
   ["Grade, pryse en verwagte hoeveelhede", "Grades, prices and expected quantities"],
+  ["Werkboekbesonderhede volg", "Workbook details pending"],
   ["Genereer ’n nuwe private skoolkode en herroep die huidige kode", "Generate a new private school code and revoke the current code"],
   ["Stoor skoolopstelling", "Save school setup"], ["Nuwe private skooltoegang", "New private school access"],
   ["Toegangskode", "Access code"], ["Bestelskakel", "Order link"], ["Kopieer kode", "Copy code"],
@@ -151,7 +152,12 @@ function renderOfferingFields(selected) {
   $("#offering-fields").innerHTML = state.catalog.grades.map((grade) => {
     const book = state.catalog.books.find((item) => item.grade_id === grade.id);
     const current = selectedMap.get(grade.id);
-    return `<label class="offering-row"><input type="checkbox" data-offering-enabled data-grade-id="${grade.id}" data-book-id="${book?.id ?? ""}" ${current?.active ? "checked" : ""} /><span>${escapeHtml(localGrade(grade.name))}</span><input data-offering-price type="number" min="0" step="0.01" value="${((current?.price_cents ?? book?.default_price_cents ?? 0) / 100).toFixed(2)}" aria-label="${escapeAttribute(`${localGrade(grade.name)} ${tr("prys", "price")}`)}" /><input data-offering-expected type="number" min="0" step="1" value="${current?.expected_quantity ?? 0}" aria-label="${escapeAttribute(`${localGrade(grade.name)} ${tr("verwagte hoeveelheid", "expected quantity")}`)}" /></label>`;
+    const unavailable = !book || book.active === false;
+    const price = unavailable ? "" : ((current?.price_cents ?? book.default_price_cents ?? 0) / 100).toFixed(2);
+    const expected = unavailable ? "" : (current?.expected_quantity ?? 0);
+    const disabled = unavailable ? "disabled" : "";
+    const note = unavailable ? `<small>${escapeHtml(tr("Werkboekbesonderhede volg", "Workbook details pending"))}</small>` : "";
+    return `<label class="offering-row ${unavailable ? "is-unavailable" : ""}"><input type="checkbox" data-offering-enabled data-grade-id="${grade.id}" data-book-id="${book?.id ?? ""}" ${current?.active ? "checked" : ""} ${disabled} /><span class="offering-grade">${escapeHtml(localGrade(grade.name))}${note}</span><input data-offering-price type="number" min="0" step="0.01" value="${price}" placeholder="—" aria-label="${escapeAttribute(`${localGrade(grade.name)} ${tr("prys", "price")}`)}" ${disabled} /><input data-offering-expected type="number" min="0" step="1" value="${expected}" placeholder="—" aria-label="${escapeAttribute(`${localGrade(grade.name)} ${tr("verwagte hoeveelheid", "expected quantity")}`)}" ${disabled} /></label>`;
   }).join("");
 }
 
@@ -457,9 +463,10 @@ function previewProgress() {
 function previewCatalog() {
   const schoolId = "7f7e51d9-6464-4cd0-8250-3b946011b645";
   const periodId = "a3290cc2-a98d-42d6-af04-47041be75e2b";
-  const grades = [{ id: "5dc50b47-660a-4ff4-8532-a245188ec803", name: "Graad 3", sort_order: 3 }, { id: "dfc52037-530e-436e-9703-c1d80288aee3", name: "Graad 4", sort_order: 4 }, { id: "0b65911f-171c-49f3-8ea5-1b15596fe76b", name: "Graad 5", sort_order: 5 }, { id: "2cd27b9c-b343-42d9-888d-300934eaa181", name: "Graad 6", sort_order: 6 }, { id: "35827cbc-2e68-4dd3-8815-786e3f953739", name: "Graad 7", sort_order: 7 }];
-  const books = grades.map((grade, index) => ({ id: `00000000-0000-4000-8000-00000000000${index}`, grade_id: grade.id, title: `${grade.name} Werkboek`, default_price_cents: index ? 34000 : 32000 }));
-  return { academic_years: [{ id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", year: 2027, label: "2027 Academic Year", is_active: true }], grades, books, schools: [{ id: schoolId, name: tr("Laerskool Voorbeeld", "Example Primary School"), slug: "laerskool-voorbeeld", status: "active", contact_name: "", contact_email: "" }], periods: [{ id: periodId, school_id: schoolId, academic_year_id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", name: "Ouersbestellings", opens_at: "2026-09-01T00:00:00+02:00", closes_at: "2026-10-31T23:59:59+02:00", status: "open", class_required: false, delivery_note: tr("Boeke word in grootmaat afgelewer.", "Books are delivered in bulk.") }], offerings: grades.slice(0, 3).map((grade, index) => ({ id: `10000000-0000-4000-8000-00000000000${index}`, school_id: schoolId, ordering_period_id: periodId, grade_id: grade.id, book_id: books[index].id, price_cents: index ? 34000 : 32000, expected_quantity: 90 - index * 10, active: true })), access_links: [{ id: "20000000-0000-4000-8000-000000000001", school_id: schoolId, ordering_period_id: periodId, code_hint: "2027" }] };
+  const grades = [{ id: "b748a5f4-b1d8-4f85-8bb8-2c157da1b8e1", name: "Graad 1", sort_order: 1 }, { id: "f8a60f45-23e4-4fdc-8a2d-bf30cba2b1f6", name: "Graad 2", sort_order: 2 }, { id: "5dc50b47-660a-4ff4-8532-a245188ec803", name: "Graad 3", sort_order: 3 }, { id: "dfc52037-530e-436e-9703-c1d80288aee3", name: "Graad 4", sort_order: 4 }, { id: "0b65911f-171c-49f3-8ea5-1b15596fe76b", name: "Graad 5", sort_order: 5 }, { id: "2cd27b9c-b343-42d9-888d-300934eaa181", name: "Graad 6", sort_order: 6 }, { id: "35827cbc-2e68-4dd3-8815-786e3f953739", name: "Graad 7", sort_order: 7 }];
+  const books = grades.map((grade, index) => ({ id: `00000000-0000-4000-8000-00000000000${index}`, grade_id: grade.id, title: `${grade.name} Werkboek`, default_price_cents: index === 2 ? 32000 : 34000, active: index > 1 }));
+  const configuredGrades = grades.slice(2, 5);
+  return { academic_years: [{ id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", year: 2027, label: "2027 Academic Year", is_active: true }], grades, books, schools: [{ id: schoolId, name: tr("Laerskool Voorbeeld", "Example Primary School"), slug: "laerskool-voorbeeld", status: "active", contact_name: "", contact_email: "" }], periods: [{ id: periodId, school_id: schoolId, academic_year_id: "92cd8cf0-5a03-4a48-934a-3d27d1377b9a", name: "Ouersbestellings", opens_at: "2026-09-01T00:00:00+02:00", closes_at: "2026-10-31T23:59:59+02:00", status: "open", class_required: false, delivery_note: tr("Boeke word in grootmaat afgelewer.", "Books are delivered in bulk.") }], offerings: configuredGrades.map((grade, index) => ({ id: `10000000-0000-4000-8000-00000000000${index}`, school_id: schoolId, ordering_period_id: periodId, grade_id: grade.id, book_id: books.find((book) => book.grade_id === grade.id).id, price_cents: index ? 34000 : 32000, expected_quantity: 90 - index * 10, active: true })), access_links: [{ id: "20000000-0000-4000-8000-000000000001", school_id: schoolId, ordering_period_id: periodId, code_hint: "2027" }] };
 }
 function previewOrders() {
   const base = { school_id: "7f7e51d9-6464-4cd0-8250-3b946011b645", schools: { name: tr("Laerskool Voorbeeld", "Example Primary School") }, ordering_periods: { name: "Ouersbestellings", academic_years: { year: 2027 } } };

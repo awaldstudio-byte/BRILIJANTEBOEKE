@@ -19,7 +19,7 @@ async function list(req, res) {
     const [years, grades, books, schools, periods, offerings, access] = await Promise.all([
       database.from("academic_years").select("id, year, label, is_active").order("year", { ascending: false }),
       database.from("grades").select("id, code, name, sort_order").order("sort_order"),
-      database.from("books").select("id, grade_id, sku, title, default_price_cents, cover_path, active").eq("active", true),
+      database.from("books").select("id, grade_id, sku, title, default_price_cents, cover_path, active"),
       database.from("schools").select("id, slug, name, status, contact_name, contact_email, notes").order("name"),
       database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, delivery_note"),
       database.from("school_grade_offerings").select("id, school_id, ordering_period_id, grade_id, book_id, price_cents, expected_quantity, active"),

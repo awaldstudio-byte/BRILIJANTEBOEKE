@@ -175,6 +175,9 @@ th, td { border-bottom: 1px solid var(--line); padding: 9px 10px; white-space: n
 .offering-row { display: grid; grid-template-columns: 22px minmax(110px, 1fr) 130px 150px; gap: 8px; align-items: center; }
 .offering-row input[type="checkbox"] { width: 17px; height: 17px; margin: 0; }
 .offering-row input { margin: 0; }
+.offering-grade { display: grid; gap: 2px; color: var(--navy); font-weight: 700; }
+.offering-grade small { color: var(--muted); font-size: .72rem; font-weight: 500; }
+.offering-row.is-unavailable { opacity: .72; }
 fieldset { margin: 8px 0 15px; border: 1px solid var(--line); border-radius: 5px; padding: 14px; }
 legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 .generated-link { margin-top: 12px; border: 1px solid #bcdedb; border-radius: 5px; background: #f1fbfa; padding: 14px; }
