@@ -458,8 +458,13 @@ function downloadPreviewCsv(rows, filename) {
   const link = document.createElement("a");
   link.href = url;
   link.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.hidden = true;
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 function previewCsvCell(value) {
