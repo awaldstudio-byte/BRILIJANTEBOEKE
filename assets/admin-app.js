@@ -144,6 +144,8 @@ function renderCatalog() {
 
   $("#school-form [name=academic_year_id]").innerHTML = state.catalog.academic_years.map((year) => `<option value="${year.id}">${year.year}</option>`).join("");
   renderOfferingFields([]);
+  updateReportLink();
+  if (preview) setPreviewDownload($("#orders-export"), previewPaidLearnerRows(), "briljante-paid-learners");
   resetSchoolForm();
 }
 
@@ -176,7 +178,7 @@ function renderFulfilment() {
   $("#batch-list").innerHTML = state.batches.map((batch) => {
     const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
     const batchReport = preview
-      ? `<button class="btn btn-outline" type="button" data-preview-batch-download="${batch.id}">${tr("Laai batch-CSV af", "Download batch CSV")}</button>`
+      ? `<a class="btn btn-outline" href="${escapeAttribute(previewCsvDownloadUrl(previewBatchRows(batch)))}" download="${previewCsvFilename("briljante-school-batch")}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`
       : `<a class="btn btn-outline" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`;
     return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions">${batchReport}<select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
@@ -370,29 +372,14 @@ $("[data-copy-link]").addEventListener("click", async (event) => copyAccess(even
 $("#report-school").addEventListener("change", updateReportLink);
 $("#report-period").addEventListener("change", updateReportLink);
 function updateReportLink() {
-  if (preview) return;
+  if (preview) {
+    setPreviewDownload($("#report-download"), previewPaidLearnerRows({ schoolId: $("#report-school").value, periodId: $("#report-period").value }), "briljante-paid-learners");
+    return;
+  }
   const params = new URLSearchParams();
   if ($("#report-school").value) params.set("school_id", $("#report-school").value);
   if ($("#report-period").value) params.set("period_id", $("#report-period").value);
   $("#report-download").href = `/api/admin-export?${params}`;
-}
-
-if (preview) {
-  $("#orders-export").addEventListener("click", (event) => {
-    event.preventDefault();
-    downloadPreviewCsv(previewPaidLearnerRows(), "briljante-paid-learners");
-  });
-  $("#report-download").addEventListener("click", (event) => {
-    event.preventDefault();
-    downloadPreviewCsv(previewPaidLearnerRows({ schoolId: $("#report-school").value, periodId: $("#report-period").value }), "briljante-paid-learners");
-  });
-  $("#batch-list").addEventListener("click", (event) => {
-    const button = event.target.closest("[data-preview-batch-download]");
-    if (!button) return;
-    event.preventDefault();
-    const batch = state.batches.find((item) => item.id === button.dataset.previewBatchDownload);
-    if (batch) downloadPreviewCsv(previewBatchRows(batch), "briljante-school-batch");
-  });
 }
 
 function previewPaidLearnerRows({ schoolId = "", periodId = "" } = {}) {
@@ -451,20 +438,18 @@ function previewBatchRows(batch) {
   ];
 }
 
-function downloadPreviewCsv(rows, filename) {
+function setPreviewDownload(link, rows, filename) {
+  link.href = previewCsvDownloadUrl(rows);
+  link.download = previewCsvFilename(filename);
+}
+
+function previewCsvDownloadUrl(rows) {
   const csv = rows.map((row) => row.map(previewCsvCell).join(",")).join("\r\n");
-  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
-  link.hidden = true;
-  document.body.append(link);
-  link.click();
-  setTimeout(() => {
-    link.remove();
-    URL.revokeObjectURL(url);
-  }, 0);
+  return `data:text/csv;charset=utf-8,${encodeURIComponent(`\uFEFF${csv}`)}`;
+}
+
+function previewCsvFilename(filename) {
+  return `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
 }
 
 function previewCsvCell(value) {
