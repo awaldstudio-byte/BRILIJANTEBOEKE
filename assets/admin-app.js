@@ -175,7 +175,10 @@ function renderFulfilment() {
   renderBatchPeriods();
   $("#batch-list").innerHTML = state.batches.map((batch) => {
     const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
-    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions"><a class="btn btn-outline" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a><select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
+    const batchReport = preview
+      ? `<button class="btn btn-outline" type="button" data-preview-batch-download="${batch.id}">${tr("Laai batch-CSV af", "Download batch CSV")}</button>`
+      : `<a class="btn btn-outline" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`;
+    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions">${batchReport}<select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
 }
 
@@ -367,10 +370,102 @@ $("[data-copy-link]").addEventListener("click", async (event) => copyAccess(even
 $("#report-school").addEventListener("change", updateReportLink);
 $("#report-period").addEventListener("change", updateReportLink);
 function updateReportLink() {
+  if (preview) return;
   const params = new URLSearchParams();
   if ($("#report-school").value) params.set("school_id", $("#report-school").value);
   if ($("#report-period").value) params.set("period_id", $("#report-period").value);
   $("#report-download").href = `/api/admin-export?${params}`;
+}
+
+if (preview) {
+  $("#orders-export").addEventListener("click", (event) => {
+    event.preventDefault();
+    downloadPreviewCsv(previewPaidLearnerRows(), "briljante-paid-learners");
+  });
+  $("#report-download").addEventListener("click", (event) => {
+    event.preventDefault();
+    downloadPreviewCsv(previewPaidLearnerRows({ schoolId: $("#report-school").value, periodId: $("#report-period").value }), "briljante-paid-learners");
+  });
+  $("#batch-list").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-preview-batch-download]");
+    if (!button) return;
+    event.preventDefault();
+    const batch = state.batches.find((item) => item.id === button.dataset.previewBatchDownload);
+    if (batch) downloadPreviewCsv(previewBatchRows(batch), "briljante-school-batch");
+  });
+}
+
+function previewPaidLearnerRows({ schoolId = "", periodId = "" } = {}) {
+  const rows = [["School", "Academic year", "Ordering period", "Grade", "Learner first name", "Learner surname", "Parent first name", "Parent surname", "Parent email", "Parent mobile", "Order reference", "Order total", "Paid at"]];
+  for (const order of previewOrders().orders) {
+    if (order.status !== "paid") continue;
+    if (schoolId && order.school_id !== schoolId) continue;
+    if (periodId && order.ordering_period_id !== periodId) continue;
+    for (const learner of order.learners ?? []) rows.push([
+      order.schools?.name,
+      order.ordering_periods?.academic_years?.year,
+      order.ordering_periods?.name,
+      learner.grades?.name,
+      learner.first_name,
+      learner.last_name,
+      order.parent_first_name,
+      order.parent_last_name,
+      order.parent_email,
+      order.parent_mobile,
+      order.reference,
+      (order.amount_cents / 100).toFixed(2),
+      order.paid_at,
+    ]);
+  }
+  return rows;
+}
+
+function previewBatchRows(batch) {
+  const catalog = previewCatalog();
+  const items = previewOrders().orders
+    .filter((order) => order.status === "paid" && order.school_id === batch.school_id)
+    .flatMap((order) => (order.learners ?? []).map((learner) => {
+      const grade = learner.grades?.name ?? "";
+      const gradeId = catalog.grades.find((item) => item.name === grade)?.id;
+      const book = catalog.books.find((item) => item.grade_id === gradeId);
+      return { grade, book: book?.title ?? "", firstName: learner.first_name, lastName: learner.last_name, reference: order.reference, quantity: 1 };
+    }));
+  const totals = new Map();
+  for (const item of items) {
+    const key = `${item.grade}|${item.book}`;
+    totals.set(key, { grade: item.grade, book: item.book, quantity: (totals.get(key)?.quantity ?? 0) + item.quantity });
+  }
+  return [
+    ["Packing summary"],
+    ["School", batch.schools?.name ?? ""],
+    ["Academic year", batch.ordering_periods?.academic_years?.year ?? ""],
+    ["Ordering period", batch.ordering_periods?.name ?? ""],
+    ["Batch", batch.label],
+    [],
+    ["Grade", "Workbook", "Quantity"],
+    ...[...totals.values()].sort((a, b) => a.grade.localeCompare(b.grade)).map((item) => [item.grade, item.book, item.quantity]),
+    [],
+    ["Learner allocation"],
+    ["Grade", "Workbook", "Learner first name", "Learner surname", "Order reference", "Quantity"],
+    ...items.map((item) => [item.grade, item.book, item.firstName, item.lastName, item.reference, item.quantity]),
+  ];
+}
+
+function downloadPreviewCsv(rows, filename) {
+  const csv = rows.map((row) => row.map(previewCsvCell).join(",")).join("\r\n");
+  const blob = new Blob([`\uFEFF${csv}`], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function previewCsvCell(value) {
+  let text = value == null ? "" : String(value);
+  if (/^[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replaceAll('"', '""')}"`;
 }
 
 function showGeneratedAccess(result, contactEmail, schoolName) {
@@ -524,17 +619,17 @@ function previewOrders() {
   const base = (index) => {
     const school = catalog.schools[index];
     const period = catalog.periods.find((item) => item.school_id === school.id);
-    return { school_id: school.id, schools: { name: school.name }, ordering_periods: { name: period.name, academic_years: { year: 2027 } } };
+    return { school_id: school.id, ordering_period_id: period.id, schools: { name: school.name }, ordering_periods: { name: period.name, academic_years: { year: 2027 } } };
   };
   return { orders: [
     { ...base(2), id: "8", reference: "BB-26-CE8A3910", amount_cents: 32000, status: "pending_payment", parent_first_name: "Carla", parent_last_name: "Nel", parent_email: "carla.nel@example.com", created_at: "2026-09-18T10:20:00Z", learners: [{ first_name: "Jana", last_name: "Nel", grades: { name: "Graad 3" } }] },
-    { ...base(2), id: "7", reference: "BB-26-3D87B6A9", amount_cents: 34000, status: "paid", parent_first_name: "Megan", parent_last_name: "Smit", parent_email: "megan.smit@example.com", created_at: "2026-09-18T08:45:00Z", learners: [{ first_name: "Aiden", last_name: "Smit", grades: { name: "Graad 6" } }] },
-    { ...base(2), id: "6", reference: "BB-26-A19F427C", amount_cents: 66000, status: "paid", parent_first_name: "Thandi", parent_last_name: "Mokoena", parent_email: "thandi.mokoena@example.com", created_at: "2026-09-17T14:10:00Z", learners: [{ first_name: "Lebo", last_name: "Mokoena", grades: { name: "Graad 3" } }, { first_name: "Kea", last_name: "Mokoena", grades: { name: "Graad 7" } }] },
+    { ...base(2), id: "7", reference: "BB-26-3D87B6A9", amount_cents: 34000, status: "paid", parent_first_name: "Megan", parent_last_name: "Smit", parent_email: "megan.smit@example.com", created_at: "2026-09-18T08:45:00Z", paid_at: "2026-09-18T08:52:00Z", learners: [{ first_name: "Aiden", last_name: "Smit", grades: { name: "Graad 6" } }] },
+    { ...base(2), id: "6", reference: "BB-26-A19F427C", amount_cents: 66000, status: "paid", parent_first_name: "Thandi", parent_last_name: "Mokoena", parent_email: "thandi.mokoena@example.com", created_at: "2026-09-17T14:10:00Z", paid_at: "2026-09-17T14:16:00Z", learners: [{ first_name: "Lebo", last_name: "Mokoena", grades: { name: "Graad 3" } }, { first_name: "Kea", last_name: "Mokoena", grades: { name: "Graad 7" } }] },
     { ...base(1), id: "5", reference: "BB-26-D55E813B", amount_cents: 34000, status: "pending_payment", parent_first_name: "Johan", parent_last_name: "Fourie", parent_email: "johan.fourie@example.com", created_at: "2026-09-17T11:05:00Z", learners: [{ first_name: "Noah", last_name: "Fourie", grades: { name: "Graad 5" } }] },
-    { ...base(1), id: "4", reference: "BB-26-60F2ACD1", amount_cents: 68000, status: "paid", parent_first_name: "Rene", parent_last_name: "Bothma", parent_email: "rene.bothma@example.com", created_at: "2026-09-17T09:20:00Z", learners: [{ first_name: "Emma", last_name: "Bothma", grades: { name: "Graad 5" } }, { first_name: "Luca", last_name: "Bothma", grades: { name: "Graad 6" } }] },
-    { ...base(1), id: "3", reference: "BB-26-B0A83F61", amount_cents: 34000, status: "paid", parent_first_name: "Karin", parent_last_name: "Venter", parent_email: "karin.venter@example.com", created_at: "2026-09-16T13:35:00Z", learners: [{ first_name: "Zoe", last_name: "Venter", grades: { name: "Graad 4" } }] },
+    { ...base(1), id: "4", reference: "BB-26-60F2ACD1", amount_cents: 68000, status: "paid", parent_first_name: "Rene", parent_last_name: "Bothma", parent_email: "rene.bothma@example.com", created_at: "2026-09-17T09:20:00Z", paid_at: "2026-09-17T09:27:00Z", learners: [{ first_name: "Emma", last_name: "Bothma", grades: { name: "Graad 5" } }, { first_name: "Luca", last_name: "Bothma", grades: { name: "Graad 6" } }] },
+    { ...base(1), id: "3", reference: "BB-26-B0A83F61", amount_cents: 34000, status: "paid", parent_first_name: "Karin", parent_last_name: "Venter", parent_email: "karin.venter@example.com", created_at: "2026-09-16T13:35:00Z", paid_at: "2026-09-16T13:42:00Z", learners: [{ first_name: "Zoe", last_name: "Venter", grades: { name: "Graad 4" } }] },
     { ...base(0), id: "2", reference: "BB-26-42C81A9E", amount_cents: 34000, status: "pending_payment", parent_first_name: "Pieter", parent_last_name: "Botha", parent_email: "pieter@example.com", created_at: "2026-09-16T09:15:00Z", learners: [{ first_name: "Lea", last_name: "Botha", grades: { name: "Graad 4" } }] },
-    { ...base(0), id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] },
+    { ...base(0), id: "1", reference: "BB-26-7FA912C3", amount_cents: 66000, status: "paid", parent_first_name: "Annelie", parent_last_name: "Jacobs", parent_email: "annelie@example.com", created_at: "2026-09-16T08:30:00Z", paid_at: "2026-09-16T08:37:00Z", learners: [{ first_name: "Mia", last_name: "Jacobs", grades: { name: "Graad 3" } }, { first_name: "Liam", last_name: "Jacobs", grades: { name: "Graad 5" } }] },
   ] };
 }
 
@@ -559,7 +654,7 @@ function previewFulfilment() {
       label: tr("2027 Bestelbatch", "2027 order batch"),
       status: statuses[index],
       schools: { name: school.name },
-      ordering_periods: { academic_years: { year: 2027 } },
+      ordering_periods: { name: catalog.periods.find((period) => period.school_id === school.id).name, academic_years: { year: 2027 } },
       fulfilment_batch_items: [{ count: paidOrders.filter((order) => order.school_id === school.id).flatMap((order) => order.learners).length }],
     })),
   };
