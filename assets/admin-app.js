@@ -8,7 +8,7 @@ const $ = (selector) => document.querySelector(selector);
 const state = { dashboard: null, progress: [], catalog: null, orders: [], batches: [] };
 
 const englishStatic = new Map([
-  ["Administrasie", "Administration"], ["Teken uit", "Sign out"], ["INTERNE TOEGANG", "INTERNAL ACCESS"],
+  ["Briljante Boeke Administrasie", "Briljante Boeke Administration"], ["Administrasie", "Administration"], ["Teken uit", "Sign out"], ["INTERNE TOEGANG", "INTERNAL ACCESS"],
   ["Meld aan", "Sign in"], ["Gebruik die Briljante-administrasierekening.", "Use the Briljante administration account."],
   ["E-posadres", "Email address"], ["Wagwoord", "Password"], ["Oorsig", "Overview"],
   ["Bestellings", "Orders"], ["Skole", "Schools"], ["Aflewering", "Fulfilment"], ["Verslae", "Reports"], ["Interne toegang vir Briljante Boeke", "Internal access for Briljante Boeke"],
@@ -45,6 +45,7 @@ const englishStatic = new Map([
 ]);
 
 applyLanguage();
+document.querySelector('input[name="class_required"]')?.closest("label")?.remove();
 $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 init();
 
@@ -293,7 +294,6 @@ function editSchool(schoolId) {
   form.opens_at.value = localDateTime(period?.opens_at);
   form.closes_at.value = localDateTime(period?.closes_at);
   form.period_status.value = period?.status ?? "draft";
-  form.class_required.checked = false;
   form.delivery_note.value = period?.delivery_note ?? "";
   form.replace_link.checked = false;
   $("#school-form-title").textContent = school.name;

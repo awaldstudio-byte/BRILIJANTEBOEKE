@@ -188,7 +188,6 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 .access-code { font-family: monospace; font-size: 1.05rem; font-weight: 800; letter-spacing: .08em; }
 .report-card { max-width: 760px; }
 .fulfilment-intro { max-width: 900px; margin-bottom: 16px; }
-#school-form label:has(input[name="class_required"]) { display: none; }
 .batch-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 
 @media (max-width: 1120px) {

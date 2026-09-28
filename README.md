@@ -7,7 +7,7 @@ This repository contains the existing Briljante Boeke public website and the Pha
 - Private access codes and order links tied to one school and one ordering period
 - School-specific grade availability, prices and expected quantities
 - One parent order containing one or more learners from that school
-- Learner name, surname, grade and optional or required class
+- Learner name, surname and grade
 - Parent contact details and a versioned policy acknowledgement
 - Server-calculated order totals
 - PayFast checkout and server-to-server payment verification
