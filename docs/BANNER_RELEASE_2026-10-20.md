@@ -36,3 +36,13 @@ After publishing, verify the delivered assets match this source and repeat `/` 2
 ## Same-day follow-up: playback control removal
 
 At Nathan's request, removed the visible play/pause button, its styles and controller references. The animation choreography and original assets are unchanged. Autoplay continues normally; manually selecting any grade keeps that grade paused for inspection, as before. Hover/focus/offscreen suspension and reduced-motion behavior remain intact. Independent browser checks at 1440, 768, 390 and 320px passed with no JavaScript errors or overflow; all five grade buttons remain functional and at least 44px high. The 18 source/unit tests pass.
+
+## Same-day follow-up: unexpected autoplay stops
+
+Nathan reported that the animation appeared not to play. Inspection of his actual in-app browser found it rotating (Grade 7 then Grade 3, `playing=true`, all images loaded, reduced motion off). Source review identified two genuine traps: hero-wide hover pause and permanent manual-selection pause with no visible restart control.
+
+Removed the blanket hover gate. A mouse/touch grade selection now holds for eight seconds, then resumes near the next transition; repeated selections reset the hold. Pointer-focused grade buttons do not count as keyboard stops. Keyboard/assistive focus still stops persistently; a rotation control is available to assistive technology and becomes visible only with keyboard focus, leaving the normal design free of a playback button. Explicit restart is required after a keyboard stop. Reduced-motion, hidden-tab and offscreen gates remain; changing reduced-motion off no longer leaves a stale permanent pause. A versioned controller URL and optional-control guard protect refreshes against stale markup.
+
+Independent real-time browser tests passed stationary-pointer rotation, pointer selection/autoresume, rapid selection timer reset, keyboard focus and explicit restart, focused-link safety, reduced motion, four responsive widths, grade/artwork/link matching, and zero JavaScript errors. The motion choreography and original assets are unchanged.
+
+The full source/unit suite passes 26 tests, including eight isolated controller regressions for startup, timer replacement, pointer and keyboard interaction, reduced-motion toggles and visibility gates.
