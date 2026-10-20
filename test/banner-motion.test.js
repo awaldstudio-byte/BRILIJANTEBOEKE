@@ -48,6 +48,7 @@ test('website motion dependencies are local and the static first grade remains i
   const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   assert.match(html, /class="workbook-banner-grid workbook-slide" data-grade="3"/);
   assert.match(html, /class="workbook-banner-controls" hidden/);
+  assert.doesNotMatch(html, /banner-playback|banner-play-icon|banner-pause-icon/);
   assert.match(html, /src="\/assets\/vendor\/gsap-3\.14\.2\.min\.js"/);
   assert.doesNotMatch(html, /<script[^>]+src="https?:/);
 });

@@ -32,3 +32,7 @@ Physical phones, Safari and a full screen-reader audit were not tested. These sc
 Deploy only `index.html`, `assets/home-banner.js`, `assets/workbook-banner.css`, `assets/banner-motion.js` and `assets/vendor/gsap-3.14.2.min.js` into the static public-release worktree. Never merge/deploy the entire foundation application to the public domain.
 
 After publishing, verify the delivered assets match this source and repeat `/` 200 with `/admin/`, `/order/` and payment API routes 404. PayFast account verification and live payment activation remain separate outstanding work.
+
+## Same-day follow-up: playback control removal
+
+At Nathan's request, removed the visible play/pause button, its styles and controller references. The animation choreography and original assets are unchanged. Autoplay continues normally; manually selecting any grade keeps that grade paused for inspection, as before. Hover/focus/offscreen suspension and reduced-motion behavior remain intact. Independent browser checks at 1440, 768, 390 and 320px passed with no JavaScript errors or overflow; all five grade buttons remain functional and at least 44px high. The 18 source/unit tests pass.
