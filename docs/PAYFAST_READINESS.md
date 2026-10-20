@@ -63,3 +63,15 @@ Website preparation is not PayFast approval or legal certification. Local tests 
 - https://payfast.io/contact/
 
 Support address verified in PayFast's current help centre: support@payfast.help. Copy briljanteboeke@gmail.com on an onboarding request; send no passwords, merchant secrets or identity/bank documents in that email.
+
+## Release verification and correspondence
+
+- Public-source revision: `9dbd8c4` on `main`. Public changes were taken from the tested feature source without publishing the unconfigured ordering/admin application.
+- Production deployment: `dpl_69EiTssXDqQ8jGYmActy22ffebRm`, `https://www.briljanteboeke.co.za/`. The root domain redirects to www with HTTPS. Homepage, catalogue, contact, FAQs, terms and privacy return 200; script/CSS assets load. The public payment API remains unavailable (404), as intended for this static release.
+- Feature preview revision: `9c7fbac`, deployment `dpl_3NoSpDu6VyEcivBsUZzphkuLm6v2`. Stable review origin: `https://briljante-preview-awaldstudio.vercel.app`.
+- Fifteen local order/payment tests pass. These include signature/merchant/amount/source rejection, duplicate-field rejection, sandbox/live separation, explicit live-activation gating, retryable provider-confirmation failure and distinct rejected/verified event keys.
+- Browser checks passed on local source, deployed feature preview and the public website at 1440x1000, 1024x768, 768x1024, 390x844 and 320x740. Each grade 3-7 selector loads its own cover and sample pages; the banner uses Roboto; no horizontal overflow or page errors were observed. A narrow-screen policy heading wrap defect was fixed during review.
+- English and Afrikaans checkout preview tests pass: conditions are displayed in the checkout sequence before acceptance, school delivery is shown on review, and the preview does not submit orders or payments.
+- Deployed feature routes for docs, tests, review scripts, schema configuration and `.env.local` return 404. Only server routes execute; keys are not included in public source.
+- PayFast onboarding/support email sent from awaldstudio@gmail.com to support@payfast.help, CC briljanteboeke@gmail.com, 20 October 2026. Subject: `Briljante Boeke — PayFast merchant setup and website review`. Gmail message/thread ID: `1a157e49213b0337`, labelled SENT. This proves sending, not recipient inbox receipt or PayFast approval. It requests direct merchant verification assistance, correct account classification, remaining public supplier disclosures and developer/sandbox setup. No identity documents, banking details or credentials were sent.
+- Remaining activation items: correct client legal/operator/contact details, verified PayFast account and settlement account, account-specific accepted-method artwork, correct dedicated Supabase access, end-to-end sandbox/notification/reporting acceptance, operational confirmation-email delivery, final report layout and supplied Grade 1/2 content. No live payment or merchant approval is claimed.

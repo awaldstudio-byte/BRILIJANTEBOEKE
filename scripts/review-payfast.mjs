@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 const require = createRequire(import.meta.url);
 const { chromium } = require("C:/Users/natha/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
 const origin = process.env.REVIEW_ORIGIN || "http://127.0.0.1:4318";
-const output = resolve(".vercel/payfast-review");
+const output = resolve(process.env.REVIEW_OUTPUT || ".vercel/payfast-review");
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ headless: true, executablePath: "C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe" });
 const results = [];
@@ -27,8 +27,10 @@ try {
       assert.equal(await page.locator('[data-banner-grade][aria-pressed="true"]').count(), 1);
     }
     await page.locator('[data-banner-grade="3"]').click();
+    await page.waitForFunction(() => [...document.querySelectorAll(".workbook-banner img")].every((img) => img.complete && img.naturalWidth > 0));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Home overflow at ${width}`);
     await page.screenshot({ path: `${output}/home-${width}.png`, fullPage: true });
+    if (width === 1440 || width === 390) await page.screenshot({ path: `${output}/homepage-view-${width}.png`, fullPage: false });
     for (const path of ["/privacy-policy-2/", "/refund_returns/", "/frequently-asked-questions/"]) {
       await page.goto(origin + path, { waitUntil: "networkidle" });
       assert.equal(await page.locator("h1").count(), 1);
@@ -39,7 +41,7 @@ try {
     results.push({ viewport: `${width}x${height}`, homepage: "passed", grades: "3-7 passed", policies: "passed" });
     await page.close();
   }
-  for (const lang of ["en", "af"]) {
+  for (const lang of (process.env.REVIEW_PUBLIC_ONLY === "true" ? [] : ["en", "af"])) {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
     page.on("pageerror", (e) => errors.push(e.message));
     await page.goto(`${origin}/order/?preview=1&lang=${lang}`, { waitUntil: "networkidle" });
