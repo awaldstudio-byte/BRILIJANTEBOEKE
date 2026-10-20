@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { checkoutRequest, parameterString, phpUrlEncode, signature, verifyNotification } from "../api/_lib/payfast.js";
+import { requirePayFast } from "../api/_lib/env.js";
 
 test("PayFast encoding matches PHP urlencode rules", () => {
   assert.equal(phpUrlEncode("A value / ~"), "A+value+%2F+%7E");
@@ -95,4 +96,71 @@ test("ITN amount mismatch cannot mark an order paid", async () => {
   });
   assert.equal(result.valid, false);
   assert.ok(result.reasons.includes("amount_mismatch"));
+});
+
+const configured = {
+  payfastMode: "sandbox", payfastMerchantId: "10000100", payfastMerchantKey: "test-key",
+  payfastPassphrase: "test-passphrase", appOrigin: "https://example.com", payfastLiveEnabled: false,
+};
+
+test("live payments require an explicit release and non-sandbox merchant credentials", () => {
+  assert.equal(requirePayFast(configured), configured);
+  assert.throws(() => requirePayFast({ ...configured, payfastMode: "live" }), { statusCode: 503 });
+  assert.throws(() => requirePayFast({ ...configured, payfastMode: "live", payfastLiveEnabled: true }), { statusCode: 503 });
+  assert.throws(() => requirePayFast({ ...configured, appOrigin: "http://example.com" }), { statusCode: 503 });
+  assert.throws(() => requirePayFast({ ...configured, payfastMerchantKey: " " }), { statusCode: 503 });
+  const live = { ...configured, payfastMode: "live", payfastMerchantId: "12345678", payfastLiveEnabled: true };
+  assert.equal(requirePayFast(live), live);
+});
+
+function notificationFixture(extraEntries = []) {
+  const entries = [
+    ["m_payment_id", "BB-26-ABC12345"], ["pf_payment_id", "1089250"],
+    ["payment_status", "COMPLETE"], ["amount_gross", "660.00"], ["merchant_id", "10000100"], ...extraEntries,
+  ];
+  entries.push(["signature", signature(entries, "test-passphrase")]);
+  return Buffer.from(new URLSearchParams(entries).toString());
+}
+
+function verifyFixture(overrides = {}) {
+  return verifyNotification({
+    rawBody: notificationFixture(), requestIp: "196.33.227.1", mode: "sandbox", merchantId: "10000100",
+    passphrase: "test-passphrase", expectedAmountCents: 66000,
+    fetchImpl: async () => ({ ok: true, text: async () => "VALID" }),
+    resolve4Impl: async () => ["196.33.227.1"], resolve6Impl: async () => [], ...overrides,
+  });
+}
+
+test("forged signatures, merchant mismatches and untrusted sources are rejected", async () => {
+  const forged = await verifyFixture({ rawBody: Buffer.from(notificationFixture().toString().replace("COMPLETE", "FAILED")) });
+  assert.ok(forged.reasons.includes("signature_mismatch"));
+  assert.ok((await verifyFixture({ merchantId: "another-merchant" })).reasons.includes("merchant_mismatch"));
+  assert.ok((await verifyFixture({ requestIp: "203.0.113.19" })).reasons.includes("source_ip_invalid"));
+});
+
+test("live verification does not trust the sandbox notification address", async () => {
+  const result = await verifyFixture({
+    mode: "live", resolve4Impl: async (host) => host === "sandbox.payfast.co.za" ? ["196.33.227.1"] : ["203.0.113.20"],
+  });
+  assert.ok(result.reasons.includes("source_ip_invalid"));
+});
+
+test("duplicate notification fields are rejected even when their signature matches", async () => {
+  const result = await verifyFixture({ rawBody: notificationFixture([["amount_gross", "660.00"]]) });
+  assert.ok(result.reasons.includes("duplicate_fields"));
+  assert.equal(result.valid, false);
+});
+
+test("a rejected notification cannot consume the verified event's idempotency key", async () => {
+  const verified = await verifyFixture();
+  const repeated = await verifyFixture();
+  const rejected = await verifyFixture({ requestIp: "203.0.113.19" });
+  assert.equal(verified.eventKey, repeated.eventKey);
+  assert.notEqual(verified.eventKey, rejected.eventKey);
+});
+
+test("provider validation failure remains distinguishable as a retryable condition", async () => {
+  const result = await verifyFixture({ fetchImpl: async () => { throw new Error("temporary outage"); } });
+  assert.equal(result.valid, false);
+  assert.deepEqual(result.reasons, ["server_confirmation_failed"]);
 });

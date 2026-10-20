@@ -1,5 +1,7 @@
 # Briljante Boeke Paystack readiness checklist
 
+Historical alternative, superseded on 20 October 2026: Elna confirmed PayFast in her 19 October email. Use PAYFAST_READINESS.md for current preparation. No Paystack adapter or provider change is approved.
+
 This is an internal preparation document. It contains no payment credentials, identity documents or bank details.
 
 ## Current position

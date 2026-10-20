@@ -2,7 +2,7 @@ const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const schoolToken = query.get("school") ?? query.get("code") ?? "";
 const preview = query.get("preview") === "1";
-const policyVersion = "2026-09-26";
+const policyVersion = "2026-10-20";
 const locale = language === "en" ? "en-ZA" : "af-ZA";
 const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR" });
 const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" });
@@ -58,6 +58,7 @@ const englishStatic = new Map([
 ]);
 
 applyLanguage();
+document.querySelectorAll("[data-policy-language]").forEach((section) => { section.hidden = section.dataset.policyLanguage !== language; });
 init();
 
 async function init() {
@@ -68,6 +69,7 @@ async function init() {
   }
   try {
     state.config = preview ? previewConfig() : await api(`/api/public-school?token=${encodeURIComponent(schoolToken)}`);
+    if (!preview && !state.config.payments_enabled) throw new Error(tr("Aanlynbestellings is nog nie oop nie. Kontak Briljante Boeke vir hulp.", "Online ordering is not open yet. Contact Briljante Boeke for assistance."));
     if (!state.config.period.open && !preview) throw new Error(tr("Hierdie skool se bestelperiode is nie tans oop nie.", "This school's ordering period is not currently open."));
     if (!state.config.offerings.length) throw new Error(tr("Geen werkboeke is tans vir hierdie skool beskikbaar nie.", "No workbooks are currently available for this school."));
     const first = newLearner(state.config.offerings[0].id);
@@ -92,6 +94,7 @@ function renderBase() {
   $("#school-initial").textContent = school.name.trim().charAt(0).toUpperCase();
   $("#period-summary").textContent = tr(`Bestellings sluit ${date.format(new Date(period.closes_at))}`, `Orders close ${date.format(new Date(period.closes_at))}`);
   $("#book-count").textContent = tr(`${offerings.length} ${offerings.length === 1 ? "graad" : "grade"} beskikbaar`, `${offerings.length} ${offerings.length === 1 ? "grade" : "grades"} available`);
+  $("#checkout-delivery-note").textContent = `${tr("Skoolaflewering", "School delivery")}: ${period.delivery_note || tr("Boeke word in grootmaat by die skool afgelewer; die skool se bevestigde afleweringsreëlings geld.", "Books are delivered to the school in bulk; the school's confirmed delivery arrangements apply.")}`;
 }
 
 function renderBooks() {
@@ -282,6 +285,7 @@ async function startPayment() {
 }
 
 function submitExternalForm(action, fields) {
+  if (!["https://sandbox.payfast.co.za/eng/process", "https://www.payfast.co.za/eng/process"].includes(action)) throw new Error("The payment address could not be verified.");
   const form = document.createElement("form");
   form.method = "post";
   form.action = action;

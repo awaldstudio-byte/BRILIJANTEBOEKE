@@ -1,5 +1,5 @@
 import { deriveOrderToken, sha256 } from "./_lib/crypto.js";
-import { env } from "./_lib/env.js";
+import { env, requirePayFast } from "./_lib/env.js";
 import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { validateOrderInput } from "./_lib/validation.js";
@@ -9,7 +9,7 @@ export default async function handler(req, res) {
 
   try {
     const input = validateOrderInput(await readJson(req));
-    const config = env();
+    const config = requirePayFast(env());
     const orderToken = deriveOrderToken(input.idempotencyKey, config.orderTokenSecret);
     const database = serviceClient();
     const { data, error } = await database.rpc("create_school_order", {

@@ -60,12 +60,15 @@ Required values:
 - `ORDER_TOKEN_SECRET`
 - `APP_ORIGIN`
 - `PAYFAST_MODE`
+- `PAYFAST_LIVE_ENABLED` (false until merchant activation and sandbox acceptance)
 - `PAYFAST_MERCHANT_ID`
 - `PAYFAST_MERCHANT_KEY`
 - `PAYFAST_PASSPHRASE`
 - `BRILJANTE_NOTIFICATION_EMAILS`
 
 Start with `PAYFAST_MODE=sandbox`. Live mode must only be enabled after the complete sandbox acceptance run succeeds.
+
+The current readiness record is `docs/PAYFAST_READINESS.md`. Without complete payment configuration the live school interface stays closed and the order API refuses to create orders. `PAYFAST_MODE=live` additionally requires `PAYFAST_LIVE_ENABLED=true` and non-sandbox merchant credentials. Public homepage/policy publication does not activate the school-ordering application.
 
 ## Database setup
 

@@ -244,3 +244,8 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
   .button-row .btn { width: 100%; }
   .status-card { padding: 25px 18px; }
 }
+/* The purchase conditions are displayed inside checkout before affirmative acceptance. */
+.checkout-policy{padding:18px;background:#f3f7fa;border:1px solid #d4e0eb;border-radius:8px;font-size:14px;line-height:1.65;color:#274360}
+.checkout-policy h3{font-size:17px;margin:0 0 12px;color:#093464}
+.checkout-policy p{margin:0 0 12px}.checkout-policy p:last-child{margin-bottom:0}
+.phase-footer{display:flex;justify-content:space-between;gap:12px 24px;flex-wrap:wrap}.phase-footer a{color:inherit;text-underline-offset:3px}.phase-footer>span{display:block}.phase-footer>span:nth-child(2){line-height:1.8}

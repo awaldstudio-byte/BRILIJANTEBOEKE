@@ -79,6 +79,18 @@
                 </div>
                 <label>E-posadres<input name="email" type="email" autocomplete="email" required maxlength="254" /></label>
                 <label>Selfoonnommer<input name="mobile" type="tel" autocomplete="tel" required minlength="7" maxlength="30" /></label>
+                <section class="checkout-policy" data-policy-language="af" aria-label="Bestelvoorwaardes">
+                  <h3>Bestelling, betaling en aflewering</h3>
+                  <p>Briljante Boeke verskaf sy eie Afrikaans-werkboeke in Suid-Afrika. Hierdie bestelling is vir die skool en akademiese jaar hierbo. Pryse en die finale bestelbedrag word in Suid-Afrikaanse rand (ZAR) gewys. Betaling word op PayFast se betaalblad voltooi; hierdie webwerf vra nie jou kaartnommer, CVV, bankwagwoord of OTP nie.</p>
+                  <p>Betaalde boeke word per skool en graad gegroepeer en in grootmaat by die skool afgelewer, gewoonlik teen jaareinde of in Januarie voor klasse begin. Die betrokke skool se datums en afleweringsreëlings geld. Hierdie skoolbestelfasiliteit bied nie individuele huisaflewering of internasionale versending nie.</p>
+                  <p>Kontroleer elke kind se naam en graad voor betaling. Kontak info@briljanteboeke.co.za met jou bestelverwysing vir wysigings, kansellasies, verkeerde of gebrekkige boeke, of betalingsgeskille. ’n Verandering nadat voorbereiding begin het, moet deur Briljante Boeke beoordeel word. Enige reg op kansellasie, herstel, vervanging of terugbetaling ingevolge toepaslike wetgewing bly van toepassing. Goedgekeurde terugbetalings word deur die toepaslike betalingsproses hanteer; die uitkoms en verwagte verwerkingstyd word aan jou bevestig.</p>
+                </section>
+                <section class="checkout-policy" data-policy-language="en" aria-label="Order conditions" hidden>
+                  <h3>Ordering, payment and delivery</h3>
+                  <p>Briljante Boeke supplies its own Afrikaans workbooks in South Africa. This order is for the school and academic year shown above. Prices and the final order amount are shown in South African rand (ZAR). Payment is completed on PayFast’s hosted page; this website does not ask for your card number, CVV, banking password or payment OTP.</p>
+                  <p>Paid books are grouped by school and grade and delivered to the school in bulk, normally at year-end or in January before classes begin. The dates and delivery arrangements communicated for the school apply. This school-ordering facility does not offer individual home delivery or international shipping.</p>
+                  <p>Check each child’s name and grade before payment. Contact info@briljanteboeke.co.za with the order reference for amendments, cancellations, incorrect or defective books, or payment disputes. A change after preparation begins needs review by Briljante Boeke. Any cancellation, repair, replacement or refund rights under applicable law remain available. Approved refunds are handled through the appropriate payment process; the outcome and expected processing time will be confirmed to you.</p>
+                </section>
                 <label class="consent-line"><input name="consent" type="checkbox" required /> <span>Ek bevestig dat die besonderhede korrek is, dat ek die <a href="/privacy-policy-2/" target="_blank" rel="noopener">privaatheidsbeleid</a> gelees het, en dat ek die <a href="/refund_returns/" target="_blank" rel="noopener">bestel-, aflewerings- en terugbetalingsbepalings</a> aanvaar.</span></label>
                 <div class="button-row"><button class="btn btn-outline" type="button" data-back="1">Terug</button><button class="btn btn-primary" type="submit">Hersien bestelling</button></div>
               </form>
@@ -89,6 +101,9 @@
               <h2>Hersien en betaal</h2>
               <div id="review-lines" class="review-lines"></div>
               <div class="total-line"><span>Bedrag betaalbaar</span><strong id="review-total">R0,00</strong></div>
+              <p class="secure-note" id="checkout-delivery-note"></p>
+              <p class="secure-note" data-policy-language="af">Betaling bevestig jou bestelling volgens die bestel-, aflewerings- en terugbetalingsvoorwaardes wat in die vorige stap vertoon en aanvaar is. <a href="/refund_returns/" target="_blank" rel="noopener">Lees die volledige bepalings</a>.</p>
+              <p class="secure-note" data-policy-language="en" hidden>Payment confirms your order under the order, delivery and returns conditions displayed and accepted in the previous step. <a href="/refund_returns/" target="_blank" rel="noopener">Read the full terms</a>.</p>
               <p class="secure-note">Die bestelling word slegs as betaal gemerk nadat PayFast se betalingskennisgewing deur die stelsel geverifieer is.</p>
               <div class="button-row"><button class="btn btn-outline" type="button" data-back="2">Terug</button><button id="pay-button" class="btn btn-primary" type="button">Betaal met PayFast</button></div>
               <p id="payment-message" class="form-message" role="status"></p>

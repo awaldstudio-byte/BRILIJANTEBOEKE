@@ -7,11 +7,10 @@ export const PAYFAST_HOSTS = {
   live: "www.payfast.co.za",
 };
 
-const allowedSourceHosts = [
+const liveSourceHosts = [
   "www.payfast.co.za",
   "w1w.payfast.co.za",
   "w2w.payfast.co.za",
-  "sandbox.payfast.co.za",
 ];
 
 export function phpUrlEncode(value) {
@@ -113,7 +112,9 @@ export async function verifyNotification({
   const amountCents = decimalToCents(data.amount_gross);
   if (amountCents == null || amountCents !== expectedAmountCents) reasons.push("amount_mismatch");
 
-  const sourceIsValid = await isPayFastSource(requestIp, resolve4Impl, resolve6Impl);
+  if (!data.pf_payment_id || !data.payment_status || !data.m_payment_id) reasons.push("missing_payment_details");
+  if (new Set(entries.map(([key]) => key)).size !== entries.length) reasons.push("duplicate_fields");
+  const sourceIsValid = await isPayFastSource(requestIp, mode, resolve4Impl, resolve6Impl);
   if (!sourceIsValid) reasons.push("source_ip_invalid");
 
   const confirmationBody = parameterString(entries, { excludeSignature: true });
@@ -137,7 +138,7 @@ export async function verifyNotification({
     data,
     amountCents,
     eventKey: createHash("sha256")
-      .update(`${data.pf_payment_id ?? ""}|${data.payment_status ?? ""}|${data.signature ?? ""}`)
+      .update(`${data.pf_payment_id ?? ""}|${data.payment_status ?? ""}|${data.signature ?? ""}|${reasons.length === 0 ? "verified" : "rejected"}`)
       .digest("hex"),
   };
 }
@@ -150,11 +151,11 @@ export function forwardedIp(headers) {
     .replace(/^::ffff:/, "");
 }
 
-async function isPayFastSource(requestIp, resolve4Impl, resolve6Impl) {
+async function isPayFastSource(requestIp, mode, resolve4Impl, resolve6Impl) {
   if (!requestIp) return false;
   const validIps = new Set();
   await Promise.all(
-    allowedSourceHosts.map(async (host) => {
+    (mode === "sandbox" ? ["sandbox.payfast.co.za"] : liveSourceHosts).map(async (host) => {
       const [ipv4, ipv6] = await Promise.all([
         resolve4Impl(host).catch(() => []),
         resolve6Impl(host).catch(() => []),

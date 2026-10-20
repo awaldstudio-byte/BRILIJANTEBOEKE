@@ -1,4 +1,5 @@
 import { sha256 } from "./_lib/crypto.js";
+import { env, requirePayFast } from "./_lib/env.js";
 import { json, methodNotAllowed, publicError } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 
@@ -50,7 +51,10 @@ export default async function handler(req, res) {
       .order("sort_order", { referencedTable: "grades", ascending: true });
     assertDatabaseResult(offeringsError);
 
+    let paymentsEnabled = false;
+    try { requirePayFast(env()); paymentsEnabled = true; } catch { /* Ordering stays closed until payment configuration is complete. */ }
     return json(res, 200, {
+      payments_enabled: paymentsEnabled,
       school: { slug: school.slug, name: school.name },
       period: {
         name: period.name,
