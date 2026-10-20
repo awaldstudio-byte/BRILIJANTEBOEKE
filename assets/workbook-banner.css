@@ -1,0 +1,21 @@
+.workbook-banner.home-hero{height:auto;min-height:0;overflow:visible;background:#fff;color:#093464;box-shadow:0 1px 10px #09346418}
+.workbook-banner-inner{max-width:1338px;width:88vw;margin:auto;padding:48px 0 30px;font-family:Roboto,Arial,sans-serif}
+.workbook-banner h1{text-align:center;color:#078681;font:600 clamp(28px,3.6vw,54px)/1.2 Roboto,Arial,sans-serif;margin:0 0 42px;letter-spacing:-.02em}
+.workbook-banner-grid{display:grid;grid-template-columns:.95fr 1fr 1fr;gap:46px;align-items:center}
+.workbook-publisher{font-size:15px;letter-spacing:.07em;margin:0 0 22px}
+.workbook-banner h2{font:600 clamp(36px,4.6vw,68px)/1.1 Roboto,Arial,sans-serif;color:#078681;margin:0 0 24px}
+.workbook-banner-copy>p:not(.workbook-publisher){font-size:19px;line-height:1.65;margin:0 0 24px}
+.workbook-banner-copy>p>span{color:#4d5d6d;font-size:16px}
+.workbook-banner-copy>a{display:inline-block;font-size:14px;text-decoration:underline;text-underline-offset:5px;color:#093464}
+.workbook-banner-cover img{display:block;width:100%;height:auto;max-height:450px;object-fit:contain}
+.workbook-banner-samples{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.workbook-banner-samples img{display:block;width:100%;height:auto;aspect-ratio:210/297;object-fit:contain;border:1px solid #e3e9ed}
+.workbook-grade-controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:32px 0 14px}
+.workbook-grade-controls button{background:white;color:#093464;border:1px solid #c8d5df;border-radius:4px;padding:10px 18px;font:500 15px Roboto,Arial,sans-serif;min-height:44px}
+.workbook-grade-controls button[aria-pressed=true]{background:#093464;color:white;border-color:#093464}
+.workbook-grade-controls button:hover{border-color:#078681}
+.workbook-grade-controls button:focus-visible,.workbook-banner a:focus-visible{outline:3px solid #078681;outline-offset:4px}
+.workbook-coming-soon{color:#4d5d6d;text-align:center;font-size:13px;margin:0;line-height:1.7}
+.workbook-coming-soon span{display:inline-block}
+@media(max-width:999.98px){.workbook-banner-inner{padding-top:36px}.workbook-banner-grid{gap:24px}.workbook-banner h1{margin-bottom:30px}.workbook-banner-cover img{max-height:340px}.workbook-banner-copy>p:not(.workbook-publisher){font-size:16px}.workbook-banner-copy>p>span{font-size:14px}}
+@media(max-width:689.98px){.workbook-banner-inner{width:90vw;padding-top:28px}.workbook-banner-grid{grid-template-columns:1fr 1fr;gap:24px 18px}.workbook-banner-copy{grid-column:1/-1;text-align:center}.workbook-banner h1{font-size:29px;margin-bottom:26px}.workbook-publisher{font-size:12px;margin-bottom:10px}.workbook-banner h2{font-size:40px;margin-bottom:12px}.workbook-banner-copy>p:not(.workbook-publisher){margin-bottom:12px}.workbook-banner-cover img{max-height:none}.workbook-grade-controls{gap:8px;margin-top:25px}.workbook-grade-controls button{padding:9px 12px;font-size:13px}.workbook-coming-soon span{display:block}}
