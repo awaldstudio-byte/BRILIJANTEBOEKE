@@ -11,14 +11,21 @@
   <div class="mobile-scrim"></div>
   <div class="search-overlay" aria-hidden="true"><button class="search-close" aria-label="Close search">×</button><div class="search-box"><label for="site-search">Search</label><input id="site-search" type="search" autocomplete="off" placeholder="Search…"><div id="search-results"></div></div></div>
 </header><main><section class="home-hero workbook-banner" aria-labelledby="workbook-heading">
+  <div class="banner-rings" aria-hidden="true"></div>
   <div class="workbook-banner-inner">
     <h1 id="workbook-heading">Maak Afrikaans ’n Avontuur!</h1>
-    <div class="workbook-banner-grid">
-      <div class="workbook-banner-copy"><p class="workbook-publisher">BRILJANTE BOEKE</p><h2 id="banner-grade">Graad 3</h2><p>Afrikaans EAT Werkboek<br><span lang="en">Afrikaans FAL Workbook</span></p><a id="banner-book-link" href="/product/graad-3/">Besigtig werkboek | View workbook</a></div>
+    <div class="workbook-slides" id="workbook-slides" aria-live="off">
+    <div class="workbook-banner-grid workbook-slide" data-grade="3">
+      <div class="workbook-banner-copy"><p class="workbook-publisher">BRILJANTE BOEKE</p><h2 id="banner-grade" class="banner-grade">Graad 3</h2><p>Afrikaans EAT Werkboek<span lang="en">Afrikaans FAL Workbook</span></p><a id="banner-book-link" class="banner-book-link" href="/product/graad-3/">Besigtig werkboek <span lang="en">| View workbook</span><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a></div>
       <a id="banner-cover-link" class="workbook-banner-cover" href="/product/graad-3/"><img id="banner-cover" src="/assets/images/815-Book-Cover-Graad-3.png" alt="Graad 3 Afrikaans-werkboek" width="420" height="595" fetchpriority="high"></a>
       <div class="workbook-banner-samples" aria-label="Voorbeeldbladsye | Sample pages"><img src="/assets/images/815-Graad-3-content-5.png" alt="Graad 3 voorbeeldbladsy 1" width="210" height="297"><img src="/assets/images/815-Graad-3-content-9.png" alt="Graad 3 voorbeeldbladsy 2" width="210" height="297"><img src="/assets/images/815-Graad-3-content-14.png" alt="Graad 3 voorbeeldbladsy 3" width="210" height="297"><img src="/assets/images/815-Graad-3-content-2.png" alt="Graad 3 voorbeeldbladsy 4" width="210" height="297"></div>
     </div>
-    <div class="workbook-grade-controls" role="group" aria-label="Kies ’n graad | Choose a grade"><button type="button" data-banner-grade="3" aria-pressed="true">Graad 3</button><button type="button" data-banner-grade="4" aria-pressed="false">Graad 4</button><button type="button" data-banner-grade="5" aria-pressed="false">Graad 5</button><button type="button" data-banner-grade="6" aria-pressed="false">Graad 6</button><button type="button" data-banner-grade="7" aria-pressed="false">Graad 7</button></div>
+    </div>
+    <div class="workbook-banner-controls" hidden>
+      <div class="workbook-grade-controls" role="group" aria-label="Kies ’n graad | Choose a grade"><button type="button" data-banner-grade="3" aria-pressed="true">Graad 3</button><button type="button" data-banner-grade="4" aria-pressed="false">Graad 4</button><button type="button" data-banner-grade="5" aria-pressed="false">Graad 5</button><button type="button" data-banner-grade="6" aria-pressed="false">Graad 6</button><button type="button" data-banner-grade="7" aria-pressed="false">Graad 7</button></div>
+      <button class="banner-playback" type="button" aria-label="Onderbreek animasie | Pause animation" aria-pressed="false"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path class="banner-pause-icon" d="M8 5v14M16 5v14" fill="none" stroke="currentColor" stroke-width="2.5"/><path class="banner-play-icon" d="m8 5 11 7-11 7Z" fill="currentColor"/></svg><span>Onderbreek | Pause</span></button>
+    </div>
+    <p class="banner-status sr-only" aria-live="polite" aria-atomic="true"></p>
     <p class="workbook-coming-soon">Graad 1 en 2: werkboekbesonderhede volg. <span lang="en">Grade 1 and 2: workbook information to follow.</span></p>
   </div>
 </section>
@@ -35,4 +42,4 @@ Do you have any questions?<br>Feel free to contact us anytime.</h5></div><div cl
 <div class="home-bottom-space"></div></main><footer class="site-footer">
   <div class="footer-middle"><div class="footer-container"><section class="footer-contact"><h3>Contact Info</h3><p class="footer-email"><i class="fas fa-envelope"></i><span><strong>Email</strong><br><a href="mailto:info@briljanteboeke.co.za">info@briljanteboeke.co.za</a></span></p><p class="footer-email"><i class="fas fa-envelope"></i><span><strong>Email</strong><br><a href="mailto:sales@briljanteboeke.co.za">sales@briljanteboeke.co.za</a></span></p></section></div></div>
   <div class="footer-bottom"><div class="footer-container bottom-grid"><div class="copyright"><p>Site maintained by&nbsp;<a href="http://www.brightwebstudio.co.za/">www.brightwebstudio.co.za</a>&nbsp;</p><p>All Rights Reserved - Briljante Boeke {2025}</p></div><div class="policy-links"><a href="/frequently-asked-questions/">FAQ</a> | <a href="/privacy-policy-2/">Privaatheidsbeleid</a> | <a href="/refund_returns/">Gebruiksvoorwaardes</a></div></div></div>
-</footer><script src="/assets/site.js"></script><script src="/assets/home-banner.js" defer></script></body></html>
+</footer><script src="/assets/site.js"></script><script src="/assets/vendor/gsap-3.14.2.min.js" defer></script><script src="/assets/banner-motion.js" defer></script><script src="/assets/home-banner.js" defer></script></body></html>
