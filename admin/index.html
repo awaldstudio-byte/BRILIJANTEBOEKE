@@ -13,13 +13,50 @@
   <body class="admin-page">
     <header class="admin-header"><div class="admin-brand"><img src="/assets/images/logo-white.png" alt="Briljante Boeke" /><span>Briljante Boeke Administrasie</span></div><div class="header-actions"><div class="language-switch" aria-label="Language"><button type="button" data-language="af">AF</button><button type="button" data-language="en">EN</button></div><div id="admin-user" class="admin-user" hidden><span id="user-initial" class="user-initial">B</span><span id="user-name"></span><button id="logout-button" type="button">Teken uit</button></div></div></header>
 
-    <main id="login-view" class="login-shell">
-      <form id="login-form" class="login-card">
-        <p class="phase-label">INTERNE TOEGANG</p><h1>Meld aan</h1><p>Gebruik die Briljante-administrasierekening.</p>
-        <label>E-posadres<input name="email" type="email" autocomplete="username" required /></label>
-        <label>Wagwoord<input name="password" type="password" autocomplete="current-password" minlength="8" required /></label>
-        <button class="btn btn-primary btn-full" type="submit">Meld aan</button><p id="login-message" class="form-message" role="alert"></p>
-      </form>
+    <main id="login-view" class="login-shell staff-login-shell">
+      <section class="login-card staff-login-card" aria-labelledby="staff-access-title">
+        <p class="phase-label" data-auth-copy="staffOnly">PERSONEELTOEGANG</p>
+        <h1 id="staff-access-title" tabindex="-1">Meld aan</h1>
+        <p id="staff-access-intro" class="auth-intro">Voer u goedgekeurde e-posadres in om voort te gaan.</p>
+        <p id="staff-email-summary" class="auth-email-summary" hidden></p>
+        <form id="staff-email-form" class="auth-step" method="post">
+          <label><span data-auth-copy="email">E-posadres</span><input id="staff-email" name="email" type="email" autocomplete="username" inputmode="email" maxlength="254" required /></label>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="continue">Gaan voort</button>
+        </form>
+        <form id="staff-password-form" class="auth-step" method="post" hidden>
+          <label><span data-auth-copy="password">Wagwoord</span><span class="auth-password-control"><input id="staff-password" name="password" type="password" autocomplete="current-password" maxlength="200" required /><button type="button" data-toggle-password="staff-password" aria-pressed="false">Wys</button></span></label>
+          <label class="checkbox-field"><input id="staff-remember" type="checkbox" /><span data-auth-copy="remember">Onthou hierdie toestel vir 30 dae</span></label>
+          <p class="auth-hint" data-auth-copy="sharedDevice">Moenie hierdie opsie op ’n gedeelde of openbare toestel gebruik nie.</p>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="signIn">Meld aan</button>
+          <button id="staff-request-code" class="auth-link" type="button" data-auth-copy="setupReset">Eerste toegang of wagwoord vergeet?</button>
+          <button class="auth-link" type="button" data-auth-start-over data-auth-copy="differentEmail">Gebruik ’n ander e-posadres</button>
+        </form>
+        <form id="staff-code-form" class="auth-step" method="post" hidden>
+          <label><span data-auth-copy="emailCode">E-posverifikasiekode</span><input id="staff-email-code" name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6,10}" minlength="6" maxlength="10" required /></label>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="verifyEmail">Verifieer e-posadres</button>
+          <button id="staff-resend-code" class="auth-link" type="button" data-auth-copy="resend">Stuur ’n nuwe kode</button>
+          <button class="auth-link" type="button" data-auth-start-over data-auth-copy="differentEmail">Gebruik ’n ander e-posadres</button>
+        </form>
+        <form id="staff-new-password-form" class="auth-step" method="post" hidden>
+          <label><span data-auth-copy="newPassword">Nuwe wagwoord</span><span class="auth-password-control"><input id="staff-new-password" name="password" type="password" autocomplete="new-password" minlength="16" maxlength="72" required /><button type="button" data-toggle-password="staff-new-password" aria-pressed="false">Wys</button></span></label>
+          <label><span data-auth-copy="confirmPassword">Bevestig wagwoord</span><input name="confirmation" type="password" autocomplete="new-password" minlength="16" maxlength="72" required /></label>
+          <p class="auth-hint" data-auth-copy="passwordHint">Gebruik minstens 16 karakters: ’n mengsel van letters, syfers en simbole, of ’n wagwoordfrase van vyf verskillende woorde. Gebruik ’n unieke wagwoord.</p>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="savePassword">Stoor wagwoord</button>
+        </form>
+        <form id="staff-mfa-form" class="auth-step" method="post" hidden>
+          <div id="staff-mfa-enrolment" hidden>
+            <p class="auth-hint" data-auth-copy="scanQr">Voeg Briljante Boeke by u verifikasie-app deur die QR-kode te skandeer.</p>
+            <img id="staff-mfa-qr" class="auth-qr" alt="Authenticator setup QR code" />
+            <details><summary data-auth-copy="manualKey">Kan u nie die kode skandeer nie?</summary><label><span data-auth-copy="setupKey">Opstelsleutel — hou dit privaat</span><input id="staff-mfa-key" readonly autocomplete="off" /></label></details>
+          </div>
+          <label><span data-auth-copy="authenticatorCode">Kode uit u verifikasie-app</span><input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="verifySignIn">Verifieer en meld aan</button>
+          <p class="auth-hint" data-auth-copy="lostAuthenticator">As u toegang tot u verifikasie-app verloor het, kontak tegniese ondersteuning.</p>
+        </form>
+        <p id="login-message" class="form-message auth-message" role="alert" aria-live="polite"></p>
+        <div class="auth-support"><a href="mailto:technical@awaldstudio.com" data-auth-copy="support">Tegniese ondersteuning</a><a href="/privacy-policy-2/" data-auth-copy="privacy">Privaatheid</a></div>
+        <noscript><p>JavaScript is required for secure sign-in. Please enable it or contact technical support.</p></noscript>
+      </section>
     </main>
 
     <div id="admin-app" class="admin-shell" hidden>

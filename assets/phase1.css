@@ -126,6 +126,28 @@ input:focus, select:focus, textarea:focus { border-color: var(--turquoise); box-
 .login-shell { min-height: calc(100vh - 80px); padding: 45px 20px; display: grid; place-items: start center; }
 .login-card { width: min(430px, 100%); border: 1px solid var(--line); border-radius: 8px; background: white; padding: 30px; box-shadow: var(--shadow); }
 .login-card h1 { font-size: 2.1rem; }
+.staff-login-shell { padding: clamp(32px, 7vh, 80px) 20px 48px; }
+.staff-login-card { width: min(480px, 100%); padding: clamp(24px, 5vw, 38px); border-top: 4px solid var(--turquoise); }
+.staff-login-card h1 { line-height: 1.15; margin-bottom: 16px; }
+.auth-intro { color: var(--muted); font-size: .95rem; line-height: 1.65; margin-bottom: 24px; }
+.auth-email-summary { background: var(--soft); border: 1px solid var(--line); padding: 10px 12px; border-radius: 4px; overflow-wrap: anywhere; font-size: .86rem; }
+.auth-step label { font-size: .86rem; }
+.auth-step input { min-height: 46px; font-size: 1rem; }
+.auth-step .checkbox-field { margin-top: 16px; line-height: 1.5; }
+.auth-step .checkbox-field input { min-height: 18px; width: 18px; height: 18px; margin-top: 3px; }
+.auth-step > .btn { margin-top: 12px; }
+.auth-hint { color: var(--muted); font-size: .8rem; line-height: 1.6; margin: 10px 0 18px; }
+.auth-link { display: block; width: 100%; border: 0; background: none; color: var(--navy); padding: 13px 0 4px; text-decoration: underline; font-size: .84rem; line-height: 1.5; cursor: pointer; }
+.auth-link:focus-visible, .auth-support a:focus-visible { outline: 2px solid var(--navy); outline-offset: 4px; }
+.auth-password-control { display: flex; align-items: stretch; gap: 6px; }
+.auth-password-control input { min-width: 0; flex: 1; }
+.auth-password-control button { margin-top: 5px; flex: 0 0 64px; border: 1px solid #c7d2dd; border-radius: 4px; color: var(--navy); background: var(--soft); cursor: pointer; font-size: .8rem; }
+.auth-support { border-top: 1px solid var(--line); padding-top: 18px; margin-top: 22px; display: flex; flex-wrap: wrap; gap: 12px 24px; font-size: .8rem; }
+.auth-support a { color: var(--navy); }
+.auth-message { overflow-wrap: anywhere; }
+.auth-qr { display: block; width: 200px; max-width: 100%; height: auto; padding: 10px; background: white; margin: 0 auto 18px; }
+.auth-step details { font-size: .8rem; color: var(--navy); margin-bottom: 20px; }
+.auth-step details input { font-family: monospace; font-size: .8rem; }
 .admin-shell { min-height: calc(100vh - 80px); display: grid; grid-template-columns: 225px minmax(0, 1fr); }
 .admin-nav { border-right: 1px solid var(--line); background: white; padding: 28px 0; }
 .admin-nav button { width: 100%; padding: 13px 25px; border: 0; border-left: 4px solid transparent; background: transparent; color: var(--body); text-align: left; cursor: pointer; }

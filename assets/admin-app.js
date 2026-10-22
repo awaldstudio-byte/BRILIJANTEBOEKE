@@ -1,3 +1,4 @@
+import { initStaffAccess } from './staff-access.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -47,10 +48,15 @@ const englishStatic = new Map([
 applyLanguage();
 document.querySelector('input[name="class_required"]')?.closest("label")?.remove();
 $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date());
+const staffAccess = initStaffAccess({ language, onAuthenticated: async staff => { showAdmin(staff); await loadData(); } });
 init();
 
 async function init() {
   if (preview) {
+    const notice = document.createElement('p');
+    notice.className = 'notice';
+    notice.textContent = tr('Demonstrasie: slegs voorbeelddata. Geen toegang tot werklike rekords nie.', 'Demonstration: sample data only. No access to real records.');
+    $('#admin-app').prepend(notice);
     showAdmin({ display_name: "Briljante", role: "administrator" });
     await loadData();
     return;
@@ -61,25 +67,9 @@ async function init() {
     await loadData();
   } catch {
     $("#login-view").hidden = false;
+    await staffAccess.resume();
   }
 }
-
-$("#login-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector("button");
-  button.disabled = true;
-  $("#login-message").textContent = "";
-  try {
-    const values = Object.fromEntries(new FormData(event.currentTarget));
-    const result = await api("/api/admin-login", { method: "POST", body: JSON.stringify(values) });
-    showAdmin(result.staff);
-    await loadData();
-  } catch (error) {
-    $("#login-message").textContent = error.message;
-  } finally {
-    button.disabled = false;
-  }
-});
 
 $("#logout-button").addEventListener("click", async () => {
   if (!preview) await api("/api/admin-login", { method: "DELETE", body: "{}" }).catch(() => {});

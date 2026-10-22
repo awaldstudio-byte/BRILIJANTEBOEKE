@@ -1,41 +1,60 @@
-import { clearSessionCookies, requireSameOrigin, setSessionCookies } from "./_lib/auth.js";
-import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
-import { assertDatabaseResult, publicAuthClient, serviceClient } from "./_lib/supabase.js";
-import { text } from "./_lib/validation.js";
+import { waitUntil } from '@vercel/functions';
+import { requireSameOrigin } from './_lib/auth.js';
+import { json, methodNotAllowed, publicError, readJson } from './_lib/http.js';
+import { serviceClient, publicAuthClient, assertDatabaseResult } from './_lib/supabase.js';
+import { clearSessionCookies, parseCookies, authCookies, tokenHash, loadStaffSession,
+  createStaffSession, authorisedStaff } from './_lib/staff-session.js';
+import { normaliseStaffEmail, approvedEmail, limitStaffRequest, requestStaffCode, verifyStaffCode,
+  setStaffPassword, beginStaffMfa, finishStaffMfa } from './_lib/staff-onboarding.js';
 
-export default async function handler(req, res) {
-  if (!["POST", "DELETE"].includes(req.method)) return methodNotAllowed(res, ["POST", "DELETE"]);
-
-  try {
-    requireSameOrigin(req);
-    if (req.method === "DELETE") {
-      clearSessionCookies(res);
-      return json(res, 200, { ok: true });
+export function createStaffLoginHandler({ databaseFactory = serviceClient, authFactory = publicAuthClient, schedule = waitUntil } = {}) {
+  return async function handler(req, res) {
+    if (!['POST', 'DELETE'].includes(req.method)) return methodNotAllowed(res, ['POST', 'DELETE']);
+    try {
+      requireSameOrigin(req);
+      const database = databaseFactory();
+      const auth = authFactory();
+      if (req.method === 'DELETE') {
+        const secret = parseCookies(req.headers.cookie || '')[authCookies.session] || '';
+        if (/^[a-f0-9]{64}$/.test(secret)) {
+          const revoked = await database.from('staff_login_sessions').update({ revoked_at: new Date().toISOString() }).eq('token_hash', tokenHash(secret));
+          assertDatabaseResult(revoked.error);
+        }
+        clearSessionCookies(res);
+        return json(res, 200, { ok: true });
+      }
+      const body = await readJson(req, 8_000);
+      if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'Invalid account request.' });
+      const action = typeof body.action === 'string' ? body.action : 'password';
+      if (!['password', 'request-code', 'verify-code', 'status', 'new-password', 'mfa-begin', 'mfa-verify'].includes(action)) {
+        return json(res, 400, { error: 'Invalid account action.' });
+      }
+      const email = ['password', 'request-code'].includes(action) ? normaliseStaffEmail(body.email) : '';
+      if (action !== 'status') await limitStaffRequest(database, req, action, email);
+      if (action === 'request-code') return json(res, 200, await requestStaffCode(database, res, email, body.remember, schedule));
+      if (action === 'verify-code') return json(res, 200, await verifyStaffCode(database, auth, req, res, body.code));
+      if (action === 'password') {
+        const denied = () => json(res, 401, { error: 'The email address or password is incorrect. For first-time access, use account setup.' });
+        const approval = await approvedEmail(database, email);
+        if (!approval?.auth_user_id || !approval.password_set_at || typeof body.password !== 'string' || body.password.length > 200) return denied();
+        const result = await auth.auth.signInWithPassword({ email, password: body.password });
+        if (result.error || !result.data.session || result.data.user?.id !== approval.auth_user_id || !result.data.user.email_confirmed_at) return denied();
+        await createStaffSession(database, res, result.data.session, approval, 'password', body.remember);
+        return json(res, 200, { next: 'mfa' });
+      }
+      const context = await loadStaffSession(req, res, { database, auth });
+      if (action === 'new-password') return json(res, 200, await setStaffPassword(context, res, body.password, body.confirmation));
+      if (action === 'mfa-begin') return json(res, 200, await beginStaffMfa(context));
+      if (action === 'mfa-verify') return json(res, 200, await finishStaffMfa(context, res, body.factor_id, body.code));
+      if (context.record.kind === 'verified') return json(res, 200, { next: 'new-password' });
+      if (context.record.kind === 'password') return json(res, 200, { next: 'mfa' });
+      const staff = await authorisedStaff(context);
+      return json(res, 200, { next: 'dashboard', staff });
+    } catch (error) {
+      if (!error.statusCode || error.statusCode >= 500) console.error('staff-auth: account request requires review');
+      const result = publicError(error);
+      return json(res, result.status, { error: result.message });
     }
-    const body = await readJson(req, 8_000);
-    const email = text(body.email, 5, 254, "Enter a valid email address.").toLowerCase();
-    const password = text(body.password, 8, 200, "Enter your password.");
-    const auth = publicAuthClient();
-    const { data, error } = await auth.auth.signInWithPassword({ email, password });
-    if (error || !data.session || !data.user) {
-      return json(res, 401, { error: "The email address or password is incorrect." });
-    }
-
-    const database = serviceClient();
-    const { data: staff, error: staffError } = await database
-      .from("staff_users")
-      .select("display_name, role, active")
-      .eq("user_id", data.user.id)
-      .eq("active", true)
-      .maybeSingle();
-    assertDatabaseResult(staffError);
-    if (!staff) return json(res, 403, { error: "This account does not have administration access." });
-
-    setSessionCookies(res, data.session);
-    return json(res, 200, { staff: { display_name: staff.display_name, role: staff.role } });
-  } catch (error) {
-    console.error("admin-login", { code: error.code, message: error.message });
-    const result = publicError(error);
-    return json(res, result.status, { error: result.message });
-  }
+  };
 }
+export default createStaffLoginHandler();

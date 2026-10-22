@@ -17,6 +17,7 @@ export function methodNotAllowed(res, allowed) {
 
 export async function readJson(req, maxBytes = 32_000) {
   if (req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body)) {
+    if (Buffer.byteLength(JSON.stringify(req.body), 'utf8') > maxBytes) throw tooLarge();
     return req.body;
   }
 
