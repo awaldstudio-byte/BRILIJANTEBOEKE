@@ -66,3 +66,21 @@ Latest local checks: 46 tests pass; dependency audit reports zero known vulnerab
 Still outstanding, not PayFast dependencies: existing mail-admin sign-in and sender authentication/inbox test; first dashboard administrator approval and private password setup; authenticated application CRUD/report/export acceptance; final cancellation/retry/refund handling review; backup/restore and production availability decisions. A new action-time approval was requested before granting the first dashboard administrator role. Free-plan pause risk remains an operational consideration; no upgrade was purchased.
 
 Schema installation via SQL Editor does not populate Supabase CLI migration history. Reconcile the checked-in migration baseline with the live project through the supported CLI workflow when authenticated CLI access is available; do not blindly reapply initial CREATE TABLE migrations.
+
+## Staff access and email follow-up
+
+The user privately created technical@awaldstudio.com and orders@briljanteboeke.co.za; both were observed in Purelymail Users. Preview-only non-secret sender settings are saved, with MAIL_ENABLED=false and no SMTP_PASSWORD. Incoming Briljante MX remains Google. No mail was sent or incoming route changed.
+
+The user approved technical@awaldstudio.com as full staff administrator and an internal test recipient, then requested managed, approved-email first-time password setup. Do not complete the previously prepared manual create-user form instead. Supabase Auth remains the managed provider; custom onboarding, MFA enforcement and actual staff linkage are still outstanding.
+
+Public registration is now disabled in the dedicated provider. Password minimum is set to 16 characters, secure password changes are enabled and email link expiry is 900 seconds. Existing email confirmation and secure email changes remain on. Provider leaked-password checking is a paid-plan option and has not been enabled or purchased. These provider settings alone do not complete the security work.
+
+The separately referenced automated-email conversation was read and its progress graphic inspected. Its staff summary requirements differ from the earlier minimal mail template. They are recorded with parent/staff separation, academic-year scope and acceptance gates in ACCESS_AND_EMAIL_PLAN.md. HTML/progress-summary code and controlled inbox testing are not complete.
+
+## Protected sender authentication test
+
+The user saved SMTP_PASSWORD as a write-only secret scoped only to Preview / codex/phase1-foundation. The value was not retrieved. An explicit preview-build-only SMTP verify hook was added, with no send operation, diagnostic web endpoint or runtime activation. All 50 local tests pass, including its skip, destination restriction, cleanup and safe-error tests.
+
+One hosted test on dpl_HEa2rZi5r13v4G9nHbXw4h3juNTs reached Purelymail and failed authentication (EAUTH). The preview build therefore stopped; no email was sent and no successful preview/public production was replaced. The orders mailbox's App Passwords section was still empty after a fresh reload. The next action is private SMTP-only credential creation/save, then replacement of the protected hosting secret. The rejected credential must not be retried repeatedly or described as a verified sender. MAIL_ENABLED remains false.
+
+After the user completed the private steps, Purelymail showed the VERCEL app-password entry with SMTP only; other protocol scopes were unselected. The hosting UI confirmed the replacement secret saved, restricted to the preview branch. One fresh check on dpl_8pPFWCnfQRogcrYKZ1RAQs1DUGNE (17:58 UTC) successfully authenticated over verified TLS and sent no email. That deployment is Ready. The protected secret was never read back. SMTP authentication is now verified; actual inbox delivery, the richer email templates and secure invitation/MFA onboarding remain outstanding. Runtime mail was not enabled and production was not published.
