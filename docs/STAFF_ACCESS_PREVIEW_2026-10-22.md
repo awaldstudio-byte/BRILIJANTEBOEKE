@@ -8,6 +8,8 @@ Users without a verified factor may defer after verified password setup. Account
 
 Verification for this change: 87 automated tests pass; the loopback-only synthetic UI fixture exercised initial deferral, dashboard entry, Account security, later setup and an enabled status. The setup choice was visually checked on desktop, 768px tablet and 320px mobile with no horizontal overflow at the latter two sizes. No live authenticator key or code was viewed. Live personal setup and account recovery still need the user's own acceptance. No real setup email was sent as part of this change.
 
+Optional-setup release: source 8d6ed8a, deployment dpl_DaWMe3mfMDYsyFxxk8KAUAUT6eyp, Ready and assigned to the stable preview alias. Hosted unsigned skip/options requests returned 401, cross-site skip returned 403, dashboard/export remained 401, internal source and local-only fixture paths remained 404, and the hosted access script exactly matched the reviewed local file. The existing human setup tab was not inspected or submitted; refresh it to load the new controls. No production promotion or provider setting change was made.
+
 ## Implemented
 
 The preview has an email-first sign-in page in English and Afrikaans, retaining the approved Briljante branding. There is no public signup or automatic approval for a domain. Only individually approved, active addresses may receive setup codes. The initial approval is technical@awaldstudio.com; no client invitations have been sent.
