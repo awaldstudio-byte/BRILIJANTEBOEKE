@@ -2,6 +2,8 @@ import { env, requirePayFast } from "./_lib/env.js";
 import { methodNotAllowed, readRaw } from "./_lib/http.js";
 import { forwardedIp, parseNotification, verifyNotification } from "./_lib/payfast.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
+import { waitUntil } from "@vercel/functions";
+import { schedulePaidOrderMail } from "./_lib/order-mail.js";
 
 export const config = { api: { bodyParser: false } };
 
@@ -50,6 +52,13 @@ export default async function handler(req, res) {
       p_staff_recipients: settings.notificationEmails,
     });
     assertDatabaseResult(processError);
+
+    schedulePaidOrderMail({
+      database, orderId: attempt.order_id,
+      verified: verification.valid,
+      paymentStatus: verification.data.payment_status,
+      schedule: waitUntil,
+    });
 
     return res.status(200).send("OK");
   } catch (error) {

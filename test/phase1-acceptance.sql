@@ -48,12 +48,13 @@ declare
   event_inserted boolean;
   paid_status text;
   notification_count integer;
+  batch_result jsonb;
 begin
   select public.create_school_order(
     repeat('a', 64),
     '550e8400-e29b-41d4-a716-446655440000',
     repeat('b', 64),
-    '{"first_name":"Annelie","last_name":"Jacobs","email":"annelie@example.com","mobile":"0825550123"}'::jsonb,
+    '{"first_name":"Annelie","last_name":"Jacobs","email":"annelie@example.com","mobile":"0825550123","consent":{"accepted":true,"policy_version":"2026-10-20"}}'::jsonb,
     '[
       {"first_name":"Mia","last_name":"Jacobs","offering_id":"33333333-3333-4333-8333-333333333333","class_name":"3A"},
       {"first_name":"Liam","last_name":"Jacobs","offering_id":"44444444-4444-4444-8444-444444444444","class_name":"5B"}
@@ -116,6 +117,25 @@ begin
     raise exception 'Duplicate PayFast event was not idempotent';
   end if;
 
+  select public.create_fulfilment_batch(
+    '11111111-1111-4111-8111-111111111111'::uuid,
+    '22222222-2222-4222-8222-222222222222'::uuid,
+    'Acceptance batch', null
+  ) into batch_result;
+  if (batch_result->>'item_count')::integer <> 2 then
+    raise exception 'School batch must include both paid items';
+  end if;
+  begin
+    perform public.create_fulfilment_batch(
+      '11111111-1111-4111-8111-111111111111'::uuid,
+      '22222222-2222-4222-8222-222222222222'::uuid,
+      'Duplicate acceptance batch', null
+    );
+    raise exception 'Duplicate batch was incorrectly allowed';
+  exception when sqlstate 'P0001' then
+    if sqlerrm <> 'NO_PAID_ITEMS_AVAILABLE' then raise; end if;
+  end;
+
   if has_function_privilege('anon', 'public.create_school_order(text,text,text,jsonb,jsonb)', 'EXECUTE')
      or has_function_privilege('authenticated', 'public.create_school_order(text,text,text,jsonb,jsonb)', 'EXECUTE') then
     raise exception 'Public roles must not execute create_school_order';
@@ -134,3 +154,5 @@ end;
 $$;
 
 rollback;
+
+select 'PASS: order totals, learners, payment state, duplicate notifications, batch allocation and public role boundaries; all test records rolled back' as acceptance_result;

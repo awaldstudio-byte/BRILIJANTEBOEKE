@@ -1,6 +1,9 @@
 {
   "cleanUrls": false,
   "trailingSlash": true,
+  "functions": {
+    "api/payfast-notify.js": { "maxDuration": 120 }
+  },
   "headers": [
     {
       "source": "/(.*)",
