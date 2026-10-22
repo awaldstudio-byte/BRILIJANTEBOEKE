@@ -24,3 +24,19 @@
 .intro-card .intro-en{margin-top:0}.intro-card .short-divider{margin:12px auto}.footer-email a,.footer-contact,.footer-email i{color:#d2dde8}.footer-email a:hover{color:#11d2cd}
 @media (min-width:690px) and (max-width:999.98px){.site-header,.header-row,.site-logo{height:104px}.header-inner{width:90vw}.site-logo img{width:122px;height:auto;max-height:none}.site-header.is-sticky .site-logo img{max-height:none}.home-hero{margin-top:104px}.page-top-space.about-top{margin-top:104px}.contact-top-space{margin-top:104px}.shop-shell,.product-shell,.quote-shell{padding-top:174px}}
 @media (max-width:689.98px){.site-header,.header-row,.site-logo{height:96px}.site-logo img{width:112px;height:auto;max-height:none}.site-header.is-sticky .site-logo img{max-height:none}.home-hero{margin-top:96px}.page-top-space.about-top{margin-top:96px}.contact-top-space{margin-top:96px}.shop-shell,.product-shell,.quote-shell{padding-top:174px}}
+/* Client-supplied Grade 1/2 additions retain the original theme and catalogue order. */
+.catalogue-title{font-family:Roboto,sans-serif;font-size:30px;font-weight:600;color:#093464;margin:0 0 25px}
+.catalogue-group + .catalogue-group{margin-top:64px}
+.catalogue-group > h2,.about-books .catalogue-group > h3{font-family:Roboto,sans-serif;font-size:23px;font-weight:600;line-height:1.4;color:#093464;margin:0 0 28px}
+.catalogue-group-junior .products-grid,.catalogue-group-junior .about-book-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+.catalogue-group-upper .products-grid,.catalogue-group-upper .about-book-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.product-card .price-on-request{font-size:14px;line-height:1.5}
+.about-books > .catalogue-group:first-of-type{margin-top:35px}
+.about-books .about-book{display:block;width:100%;max-width:220px;margin:0 auto}
+.product-book-name{font-size:22px;font-weight:500;line-height:1.4;color:#4d5d6d;margin:0 0 20px}
+.product-description--bilingual h3{font-size:22px;color:#093464;margin:30px 0 14px}
+.product-gallery--extended .gallery-thumb{min-width:44px;min-height:44px;cursor:pointer}
+.product-gallery--extended .gallery-thumb[aria-pressed=true]{border-color:#093464}
+.product-gallery--extended .gallery-thumb:focus-visible{outline:3px solid #093464;outline-offset:3px}
+@media(max-width:999.98px){.catalogue-group-upper .products-grid,.catalogue-group-upper .about-book-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:689.98px){.catalogue-title{font-size:28px}.catalogue-group > h2,.about-books .catalogue-group > h3{font-size:21px}.catalogue-group + .catalogue-group{margin-top:48px}.catalogue-group-junior .products-grid,.catalogue-group-upper .products-grid,.catalogue-group-junior .about-book-grid,.catalogue-group-upper .about-book-grid{grid-template-columns:1fr}}

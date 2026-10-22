@@ -41,9 +41,9 @@ function createController({ reducedMotion = false } = {}) {
   const status = new Element();
   const controlsContainer = new Element();
   controlsContainer.hidden = true;
-  const controls = Array.from({ length: 5 }, (_, index) => {
+  const controls = Array.from({ length: 7 }, (_, index) => {
     const button = new Element();
-    button.dataset.bannerGrade = String(index + 3);
+    button.dataset.bannerGrade = String(index + 1);
     return button;
   });
   const slides = controls.map((control) => {
@@ -59,11 +59,11 @@ function createController({ reducedMotion = false } = {}) {
     slide.querySelectorAll = (selector) => selector === '[id]' ? [...nodes.values()] : [];
     return slide;
   });
-  const decodes = slides.map(() => {
+  const decodes = slides.flatMap(() => Array.from({ length: 5 }, () => {
     let resolve;
     const promise = new Promise((done) => { resolve = done; });
     return { promise, resolve };
-  });
+  }));
   const images = decodes.map(({ promise }) => ({ decode: () => promise }));
   const slideContainer = new Element();
   const elements = new Map([
@@ -197,21 +197,33 @@ test('starts automatically after images decode and the banner becomes visible', 
   assertPlayback(controller, 'running');
   assert.equal(controller.rotation.hidden, false);
   assert.equal(controller.timeline.repeats, -1);
-  assert.equal(controller.banner.dataset.grade, '3');
+  assert.equal(controller.banner.dataset.grade, '1');
   controller.advance(5000);
-  assert.equal(controller.banner.dataset.grade, '4');
+  assert.equal(controller.banner.dataset.grade, '2');
   assert.equal(controller.controls[1].getAttribute('aria-pressed'), 'true');
   assert.equal(controller.slides[0].inert, true);
   assert.equal(controller.slides[1].inert, false);
+});
+
+test('autoplay visits all seven grades and loops back to Grade 1', async () => {
+  const controller = await runningController();
+  for (let grade = 1; grade <= 7; grade++) {
+    assert.equal(controller.banner.dataset.grade, String(grade));
+    assert.equal(controller.controls[grade - 1].getAttribute('aria-pressed'), 'true');
+    assert.equal(controller.slides.filter((slide) => !slide.inert).length, 1);
+    controller.advance(5000);
+  }
+  assert.equal(controller.banner.dataset.grade, '1');
+  assertPlayback(controller, 'running');
 });
 
 test('a pointer grade selection holds for eight seconds and then resumes automatically', async () => {
   const controller = await runningController();
   controller.pointerSelect(2);
   assertPlayback(controller, 'manual-hold');
-  assert.equal(controller.banner.dataset.grade, '5');
+  assert.equal(controller.banner.dataset.grade, '3');
   assert.equal(controller.timeline.time(), 11.3);
-  assert.match(controller.status.textContent, /Graad 5 gekies/);
+  assert.match(controller.status.textContent, /Graad 3 gekies/);
 
   controller.advance(7999);
   assertPlayback(controller, 'manual-hold');
@@ -220,25 +232,27 @@ test('a pointer grade selection holds for eight seconds and then resumes automat
   assertPlayback(controller, 'running');
   assert.equal(controller.timeline.time(), 14);
   controller.advance(1000);
-  assert.equal(controller.banner.dataset.grade, '6');
+  assert.equal(controller.banner.dataset.grade, '4');
 });
 
 test('a repeated pointer selection replaces the previous hold timer', async () => {
   const controller = await runningController();
   controller.pointerSelect(1);
   controller.advance(4000);
-  controller.pointerSelect(4);
+  controller.pointerSelect(6);
   assert.equal(controller.timers.size, 1);
   assert.equal(controller.banner.dataset.grade, '7');
 
   controller.advance(4000);
   assertPlayback(controller, 'manual-hold');
-  assert.equal(controller.timeline.time(), 21.3);
+  assert.equal(controller.timeline.time(), 31.3);
   controller.advance(3999);
   assertPlayback(controller, 'manual-hold');
   controller.advance(1);
   assertPlayback(controller, 'running');
-  assert.equal(controller.timeline.time(), 24);
+  assert.equal(controller.timeline.time(), 34);
+  controller.advance(1000);
+  assert.equal(controller.banner.dataset.grade, '1');
 });
 
 test('keyboard focus stops playback until the rotation control is explicitly activated', async () => {
@@ -263,7 +277,7 @@ test('a keyboard grade selection stays paused after the selected grade is shown'
   controller.banner.emit('keydown', { target: controller.controls[2], key: 'Enter' });
   controller.controls[2].emit('click', { detail: 0 });
   assertPlayback(controller, 'user-paused');
-  assert.equal(controller.banner.dataset.grade, '5');
+  assert.equal(controller.banner.dataset.grade, '3');
   assert.equal(controller.timers.size, 0);
   controller.advance(20000);
   assertPlayback(controller, 'user-paused');
@@ -277,6 +291,7 @@ test('reduced motion can be toggled off without leaving a stale paused state', a
   const controller = await runningController({ reducedMotion: true });
   assertPlayback(controller, 'reduced-motion');
   assert.equal(controller.rotation.hidden, true);
+  assert.equal(controller.banner.dataset.grade, '1');
   controller.setReducedMotion(false);
   assertPlayback(controller, 'running');
   assert.equal(controller.rotation.hidden, false);
@@ -284,7 +299,7 @@ test('reduced motion can be toggled off without leaving a stale paused state', a
   controller.advance(5000);
   controller.setReducedMotion(true);
   assertPlayback(controller, 'reduced-motion');
-  assert.equal(controller.banner.dataset.grade, '4');
+  assert.equal(controller.banner.dataset.grade, '2');
   assert.equal(controller.timeline.time(), 6.3);
   controller.setReducedMotion(false);
   assertPlayback(controller, 'running');

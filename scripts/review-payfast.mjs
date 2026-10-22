@@ -19,14 +19,14 @@ try {
     assert.equal(await page.locator(".home-hero video").count(), 0);
     const font = await page.locator("#workbook-heading").evaluate((el) => getComputedStyle(el).fontFamily);
     assert.match(font, /Roboto/);
-    for (const grade of [3, 4, 5, 6, 7]) {
+    for (const grade of [1, 2, 3, 4, 5, 6, 7]) {
       await page.locator(`[data-banner-grade="${grade}"]`).click();
       await page.waitForFunction(() => [...document.querySelectorAll(".workbook-banner img")].every((img) => img.complete && img.naturalWidth > 0));
       assert.equal(await page.locator("#banner-grade").innerText(), `Graad ${grade}`);
       assert.match(await page.locator("#banner-cover-link").getAttribute("href"), new RegExp(`graad-${grade}`));
       assert.equal(await page.locator('[data-banner-grade][aria-pressed="true"]').count(), 1);
     }
-    await page.locator('[data-banner-grade="3"]').click();
+    await page.locator('[data-banner-grade="1"]').click();
     await page.waitForFunction(() => [...document.querySelectorAll(".workbook-banner img")].every((img) => img.complete && img.naturalWidth > 0));
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `Home overflow at ${width}`);
     await page.screenshot({ path: `${output}/home-${width}.png`, fullPage: true });
@@ -38,7 +38,7 @@ try {
       assert.ok((await page.locator(".legal-brand img").boundingBox()).width >= 100);
     }
     await page.screenshot({ path: `${output}/policy-${width}.png`, fullPage: true });
-    results.push({ viewport: `${width}x${height}`, homepage: "passed", grades: "3-7 passed", policies: "passed" });
+    results.push({ viewport: `${width}x${height}`, homepage: "passed", grades: "1-7 passed", policies: "passed" });
     await page.close();
   }
   for (const lang of (process.env.REVIEW_PUBLIC_ONLY === "true" ? [] : ["en", "af"])) {

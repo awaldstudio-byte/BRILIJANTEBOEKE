@@ -4,4 +4,5 @@ scripts/
 supabase/
 README.md
 MIGRATION_NOTES.md
-.env.example
+.env
+.env.*
