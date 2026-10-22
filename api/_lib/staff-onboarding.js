@@ -66,13 +66,16 @@ export async function deliverStaffCode(database, approval, challengeHash, { sour
     if (user.email?.toLowerCase() !== approval.email || (approval.auth_user_id && approval.auth_user_id !== user.id)) throw new Error('Identity mismatch.');
     const linked = await database.from('staff_access_approvals').update({ auth_user_id: user.id }).eq('id', approval.id).eq('active', true);
     assertDatabaseResult(linked.error);
-    const staged = await database.from('staff_setup_challenges').update({ auth_user_id: user.id, status: 'sent' })
+    const staged = await database.from('staff_setup_challenges').update({ auth_user_id: user.id })
       .eq('token_hash', challengeHash).eq('status', 'queued');
     assertDatabaseResult(staged.error);
     const settings = mailSettings({ ...source, MAIL_ENABLED: 'true' });
     transport = transportFactory(settings);
     const result = await transport.sendMail(staffCodeMessage(approval.email, generated.data.properties.email_otp, settings));
     if (!result.accepted?.some(value => String(value).toLowerCase() === approval.email)) throw new Error('Code not accepted.');
+    const sent = await database.from('staff_setup_challenges').update({ status: 'sent' })
+      .eq('token_hash', challengeHash).eq('status', 'queued');
+    assertDatabaseResult(sent.error);
   } catch {
     await database.from('staff_setup_challenges').update({ status: 'failed' }).eq('token_hash', challengeHash);
     console.error('staff-auth: code delivery requires review');

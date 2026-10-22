@@ -17,4 +17,3 @@ export function requireSameOrigin(req) {
     throw error;
   }
 }
-

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStaffLoginHandler } from '../api/admin-login.js';
-import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa } from '../api/_lib/staff-onboarding.js';
+import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa, deliverStaffCode } from '../api/_lib/staff-onboarding.js';
 import { parseCookies, cookie, sessionCookieAge, tokenHash, opaqueToken, loadStaffSession, authorisedStaff } from '../api/_lib/staff-session.js';
 import { readJson } from '../api/_lib/http.js';
 
@@ -155,4 +155,15 @@ test('MFA result without provider-confirmed aal2 cannot activate staff access',a
   provider.auth.mfa.challengeAndVerify=async()=>({data:{access_token:'token',refresh_token:'refresh'}});
   await assert.rejects(finishStaffMfa({database:db,auth:provider,user,approval,record:{...record,kind:'password'}},response(),'11111111-1111-1111-1111-111111111111','123456'),{statusCode:401});
   assert.equal(db.calls.length,0);
+});
+
+test('a setup code is marked sent only after the fixed sender accepts its intended recipient',async()=>{
+  const challenge={token_hash:'b'.repeat(64),status:'queued'};
+  const db=database({staff_access_approvals:[{...approval}],staff_setup_challenges:[challenge]});
+  db.auth={admin:{generateLink:async()=>({data:{user,properties:{email_otp:'12345678'}}})}};
+  let closed=false;
+  await deliverStaffCode(db,approval,challenge.token_hash,{source:{AUTH_MAIL_ENABLED:'true',MAIL_FROM:'orders@briljanteboeke.co.za',
+    MAIL_REPLY_TO:'info@briljanteboeke.co.za',SMTP_HOST:'smtp.purelymail.com',SMTP_PORT:'465',SMTP_USER:'orders@briljanteboeke.co.za',SMTP_PASSWORD:'synthetic-test-only'},
+    transportFactory:()=>({sendMail:async(message)=>{assert.equal(challenge.status,'queued');assert.equal(message.to,approval.email);return {accepted:[approval.email]};},close(){closed=true;}})});
+  assert.equal(challenge.status,'sent');assert.equal(closed,true);
 });

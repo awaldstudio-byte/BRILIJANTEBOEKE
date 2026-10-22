@@ -14,12 +14,14 @@ The existing preview=1 demonstration remains sample-only and now visibly identif
 
 ## Verification before hosted release
 
-- All 70 automated tests pass; 39 JavaScript files pass syntax checks.
+- All 71 automated tests pass; 39 JavaScript files pass syntax checks.
 - The new migration was installed on the dedicated project cigyxjfzbjlgbrduzcpw. It adds four private, RLS-enabled tables and two service-only functions. Only the approved technical address was seeded.
 - Rollback-only live database acceptance passed: private RLS/table/RPC permissions, durable quotas, five-attempt code limit, used-code replay denial, expiry denial and an empty active legacy directory.
 - Desktop and 390px mobile front-end layouts were visually reviewed; labels, password-manager autocomplete, keyboard focus and no horizontal overflow were checked. MFA secrets must not appear in screenshots.
 
 ## Human testing and remaining boundaries
+
+The hosted preview was verified to return 200/no-store for the login page, 401/no-store for unsigned dashboard, school, order, fulfilment and export requests, 403 for a cross-site login request, and 404 for internal code and environment paths. A controlled setup request reached the email-code screen and generated the approved technical identity. The initial application grant is still incomplete; no private password or MFA step was submitted by the agent. Delivery status is now recorded as sent only after SMTP accepts the intended recipient, not before sending. SMTP acceptance is not proof of inbox placement.
 
 The user must personally enter verification codes, choose/submit passwords and configure the authenticator. Those private steps have not been completed by the agent. Do not claim end-to-end authenticated access, inbox delivery, lost-device recovery or live CRUD/export acceptance until actually tested.
 
