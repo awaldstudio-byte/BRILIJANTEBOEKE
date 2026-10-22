@@ -91,13 +91,14 @@ try {
     assert.equal(await page.locator("#quote-items tr").count(), 2, "Saved quote must retain removals and quantities");
     assert.equal(await page.locator('#quote-items tr[data-id="815"] .quote-qty').inputValue(), "2");
 
-    for (const [grade, count] of [[1, 15], [2, 16]]) {
+    for (const [grade, count] of [[1, 10], [2, 16]]) {
       const path = `/product/graad-${grade}/`;
       await ready(page, path);
       assert.equal(await page.locator(".product-summary h1").innerText(), `Graad ${grade}`);
       assert.match(await page.locator(".product-summary .price").innerText(), /Price on request/);
       const thumbs = page.locator(".gallery-thumb");
-      assert.equal(await thumbs.count(), count, `All supplied Grade ${grade} pages must be available`);
+      assert.equal(await thumbs.count(), count, `Approved Grade ${grade} gallery count`);
+      if (grade === 1) assert.equal(await page.locator('.gallery-thumb[data-gallery-src*="/module-"]').count(), 0, 'Grade 1 module covers must not appear as sample pages');
       const sources = await thumbs.evaluateAll(buttons => buttons.map(button => ({ src: button.dataset.gallerySrc, alt: button.dataset.galleryAlt || button.getAttribute("aria-label") })));
       assert.equal(new Set(sources.map(item => item.src)).size, count, `Grade ${grade} gallery has duplicates`);
       for (let i = 0; i < count; i++) {
@@ -121,7 +122,7 @@ try {
     assert.deepEqual(links, ["/product/graad-1/", "/product/graad-2/", "/product/graad-3/", "/product/graad-4-werkboek/", "/product/graad-5/", "/product/graad-6/", "/product/graad-7/"]);
     await layout(page, "/about/", width);
     await page.screenshot({ path: `${output}/about-${width}.png`, fullPage: true });
-    results.push({ viewport: `${width}x${height}`, catalogue: "7 grades, separate Junior 1-3 / Grades 4-7", galleries: "15 and 16 unique supplied images, every thumbnail checked", quotations: "mixed POA/priced, quantity, remove, persistence passed", about: "7 linked covers", overflow: "none", search: width >= 1000 ? "English Grade 1 passed" : "not tested (mobile search hidden)" });
+    results.push({ viewport: `${width}x${height}`, catalogue: "7 grades, separate Junior 1-3 / Grades 4-7", galleries: "10 Grade 1 images without module covers; 16 Grade 2 images; every thumbnail checked", quotations: "mixed POA/priced, quantity, remove, persistence passed", about: "7 linked covers", overflow: "none", search: width >= 1000 ? "English Grade 1 passed" : "not tested (mobile search hidden)" });
     await page.close();
   }
   assert.deepEqual(errors, []);

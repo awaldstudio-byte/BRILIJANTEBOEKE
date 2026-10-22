@@ -41,3 +41,10 @@ test('every banner product has five existing images and a product page', async (
     await access(new URL(`../product/${product.slug}/index.html`, import.meta.url));
   }
 });
+
+test('Grade 1 sample gallery excludes module covers but retains its cover, title and eight content pages', async () => {
+  const html = await readFile(new URL('../product/graad-1/index.html', import.meta.url), 'utf8');
+  const sources = [...html.matchAll(/data-gallery-src="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(sources, ['cover', 'title-page', 'content-13', 'content-53', 'content-70', 'content-108', 'content-125', 'content-130', 'content-146', 'content-159'].map(name => `/assets/images/grade-1/${name}.png`));
+  assert.doesNotMatch(html, /\/grade-1\/module-\d+\.png/);
+});

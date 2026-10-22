@@ -11,7 +11,7 @@
 
 - Seven-grade homepage rotation, Grade 1 static fallback and mobile controls grouped 1–3 / 4–7.
 - Separate Junior 1–3 and Grade 4–7 catalogue groups. Responsive reflow preserves their order.
-- New product pages with all supplied covers, title pages, sample pages and module covers: 15 gallery images for Grade 1 and 16 for Grade 2.
+- New product pages with the supplied artwork and descriptions. Following the client's 22 October request, the five Grade 1 module cover pages are no longer shown in its sample gallery. Grade 1 retains its cover, title page and eight content pages (10 gallery images). Grade 2 remains unchanged at 16 images. Original files are preserved.
 - Search and quotations include both new products. Existing Grade 3–7 product identifiers and prices remain unchanged.
 - About page, homepage range and sitemap include Grades 1–7.
 
