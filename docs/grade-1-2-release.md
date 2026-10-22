@@ -10,14 +10,14 @@
 ## Public changes
 
 - Seven-grade homepage rotation, Grade 1 static fallback and mobile controls grouped 1–3 / 4–7.
-- Separate Junior 1–3 and Grade 4–7 catalogue groups. Responsive reflow preserves their order.
-- New product pages with the supplied artwork and descriptions. Following the client's 22 October request, the five Grade 1 module cover pages are no longer shown in its sample gallery. Grade 1 retains its cover, title page and eight content pages (10 gallery images). Grade 2 remains unchanged at 16 images. Original files are preserved.
+- Separate Junior 1–3 and Grade 4–7 catalogue groups. Phone catalogue now displays two books per row with compact spacing and 44px quotation buttons; desktop layout and About page remain unchanged.
+- New product pages with the supplied artwork and descriptions. Following the client's 22 October requests, the five Grade 1 module covers and all four crossed-out Grade 2 module covers are no longer shown as samples. Grade 1 retains its cover, title page and eight content pages (10 gallery images). Grade 2 retains its cover, title page and ten content pages (12 images). Original files are preserved.
 - Search and quotations include both new products. Existing Grade 3–7 product identifiers and prices remain unchanged.
 - About page, homepage range and sitemap include Grades 1–7.
 
 ## Pricing and payment boundary
 
-No Grade 1/2 price or ISBN was supplied. Do not invent either. The public pages and quotation form show "Prys op aanvraag | Price on request" for those products, including mixed quotations with already-priced books. Unknown prices never calculate as R0 or NaN.
+On 22 October the client confirmed Grade 1 and Grade 2 at R320 each and requested their prices be displayed like the other grades. Catalogue cards, both product pages and quotation calculations now use R320. Quantity 2 is R640 for each grade. ISBNs remain unconfirmed and are not invented. Unknown future prices still never calculate as R0 or NaN.
 
 This is a public catalogue/content release. It does not activate the inactive Grade 1/2 database placeholders, create school offerings, alter school-specific pricing, or enable live payments. Existing merchant approval and payment-release gates remain unchanged. Admin/order/API routes must not be included in the static public deployment.
 

@@ -48,6 +48,23 @@ try {
     assert.deepEqual(await grids.nth(0).locator(".product-card h2").allTextContents(), ["Graad 1", "Graad 2", "Graad 3"]);
     assert.deepEqual(await grids.nth(1).locator(".product-card h2").allTextContents(), ["Graad 4", "Graad 5", "Graad 6", "Graad 7"]);
     assert.match(await page.locator(".shop-shell").innerText(), /Junior/i);
+    assert.deepEqual(await grids.nth(0).locator('.price').allTextContents(), ['R320', 'R320', 'R320']);
+    if (width < 690) {
+      const mobileRows = await grids.evaluateAll(groups => groups.map(group => [...group.querySelectorAll('.product-card')].map(card => {
+        const box = card.getBoundingClientRect();
+        const button = card.querySelector('.quote-add').getBoundingClientRect();
+        return {x:box.x,y:box.y,width:box.width,buttonHeight:button.height};
+      })));
+      for (const cards of mobileRows) {
+        assert.ok(Math.abs(cards[0].y-cards[1].y)<2, 'First two mobile books must sit side by side');
+        assert.ok(cards[1].x>cards[0].x, 'Mobile books must progress left to right');
+        assert.ok(cards[2].y>cards[0].y, 'Third mobile book must start the next row');
+        assert.ok(cards.every(card=>card.buttonHeight>=44), 'Mobile quote buttons need 44px touch height');
+      }
+      const shellHeight = await page.locator('.shop-shell').evaluate(el=>el.getBoundingClientRect().height);
+      assert.ok(shellHeight < 2200, `Mobile catalogue must stay compact: ${shellHeight}px`);
+      assertions.push({viewport:`${width}x${height}`,mobileRows,catalogueHeight:shellHeight});
+    }
     if (width >= 1000) {
       const rows = await grids.evaluateAll(groups => groups.map(group => [...group.querySelectorAll(".product-card")].map(card => {
         const { x, y, width } = card.getBoundingClientRect();
@@ -75,12 +92,14 @@ try {
     assert.equal(await page.locator("#quote-items tr").count(), 3);
     for (const id of [801, 802]) {
       const subtotal = await page.locator(`#quote-items tr[data-id="${id}"] .product-subtotal`).innerText();
-      assert.match(subtotal, /Price on request/);
-      assert.doesNotMatch(subtotal, /R0|NaN/);
+      assert.equal(subtotal, 'R320');
+      assert.doesNotMatch(subtotal, /Price on request|R0|NaN/);
+      await page.locator(`#quote-items tr[data-id="${id}"] .quote-qty`).fill('2');
     }
     assert.equal(await page.locator('#quote-items tr[data-id="815"] .product-subtotal').innerText(), "R320");
     await page.locator('#quote-items tr[data-id="815"] .quote-qty').fill("2");
     await page.locator("#quote-update").click();
+    for (const id of [801, 802]) assert.equal(await page.locator(`#quote-items tr[data-id="${id}"] .product-subtotal`).innerText(), 'R640');
     assert.equal(await page.locator('#quote-items tr[data-id="815"] .product-subtotal').innerText(), "R640");
     assert.doesNotMatch(await page.locator("#quote-items").innerText(), /NaN|R0\b/);
     await layout(page, "/request-quote/", width);
@@ -91,14 +110,14 @@ try {
     assert.equal(await page.locator("#quote-items tr").count(), 2, "Saved quote must retain removals and quantities");
     assert.equal(await page.locator('#quote-items tr[data-id="815"] .quote-qty').inputValue(), "2");
 
-    for (const [grade, count] of [[1, 10], [2, 16]]) {
+    for (const [grade, count] of [[1, 10], [2, 12]]) {
       const path = `/product/graad-${grade}/`;
       await ready(page, path);
       assert.equal(await page.locator(".product-summary h1").innerText(), `Graad ${grade}`);
-      assert.match(await page.locator(".product-summary .price").innerText(), /Price on request/);
+      assert.equal(await page.locator(".product-summary .price").innerText(), 'R320');
       const thumbs = page.locator(".gallery-thumb");
       assert.equal(await thumbs.count(), count, `Approved Grade ${grade} gallery count`);
-      if (grade === 1) assert.equal(await page.locator('.gallery-thumb[data-gallery-src*="/module-"]').count(), 0, 'Grade 1 module covers must not appear as sample pages');
+      assert.equal(await page.locator('.gallery-thumb[data-gallery-src*="/module-"]').count(), 0, `Grade ${grade} module covers must not appear as sample pages`);
       const sources = await thumbs.evaluateAll(buttons => buttons.map(button => ({ src: button.dataset.gallerySrc, alt: button.dataset.galleryAlt || button.getAttribute("aria-label") })));
       assert.equal(new Set(sources.map(item => item.src)).size, count, `Grade ${grade} gallery has duplicates`);
       for (let i = 0; i < count; i++) {
@@ -122,7 +141,7 @@ try {
     assert.deepEqual(links, ["/product/graad-1/", "/product/graad-2/", "/product/graad-3/", "/product/graad-4-werkboek/", "/product/graad-5/", "/product/graad-6/", "/product/graad-7/"]);
     await layout(page, "/about/", width);
     await page.screenshot({ path: `${output}/about-${width}.png`, fullPage: true });
-    results.push({ viewport: `${width}x${height}`, catalogue: "7 grades, separate Junior 1-3 / Grades 4-7", galleries: "10 Grade 1 images without module covers; 16 Grade 2 images; every thumbnail checked", quotations: "mixed POA/priced, quantity, remove, persistence passed", about: "7 linked covers", overflow: "none", search: width >= 1000 ? "English Grade 1 passed" : "not tested (mobile search hidden)" });
+    results.push({ viewport: `${width}x${height}`, catalogue: "7 grades, separate Junior 1-3 / Grades 4-7; Grades 1-3 R320 each; two columns on phones", galleries: "10 Grade 1 and 12 Grade 2 images without module covers; every thumbnail checked", quotations: "Grades 1-3 R320 each and R640 for quantity 2; remove and persistence passed", about: "7 linked covers", overflow: "none", search: width >= 1000 ? "English Grade 1 passed" : "not tested (mobile search hidden)" });
     await page.close();
   }
   assert.deepEqual(errors, []);
