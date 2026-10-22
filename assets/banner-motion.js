@@ -43,5 +43,5 @@
     }
     return tl;
   }
-  window.BriljanteBannerMotion = { mount, timeline, stateAt: (time, count = 5) => Math.floor((time + 0.3) / 5) % count };
+  window.BriljanteBannerMotion = { mount, timeline, stateAt: (time, count = 7) => Math.floor((time + 0.3) / 5) % count };
 })();
