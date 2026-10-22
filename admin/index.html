@@ -43,6 +43,12 @@
           <p class="auth-hint" data-auth-copy="passwordHint">Gebruik minstens 16 karakters: ’n mengsel van letters, syfers en simbole, of ’n wagwoordfrase van vyf verskillende woorde. Gebruik ’n unieke wagwoord.</p>
           <button class="btn btn-primary btn-full" type="submit" data-auth-copy="savePassword">Stoor wagwoord</button>
         </form>
+        <form id="staff-mfa-choice" class="auth-step" method="post" hidden>
+          <p class="auth-hint" data-auth-copy="optionalMfa">’n Verifikasie-app beskerm u rekening indien u wagwoord gesteel word. U kan dit nou of later onder Rekeningsekuriteit opstel.</p>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="enableMfa">Stel tweestapverifikasie op</button>
+          <button id="staff-choice-skip" class="auth-link" type="button" data-auth-copy="setUpLater">Stel later op</button>
+          <button id="staff-choice-cancel" class="auth-link" type="button" data-auth-copy="backDashboard" hidden>Terug na administrasie</button>
+        </form>
         <form id="staff-mfa-form" class="auth-step" method="post" hidden>
           <div id="staff-mfa-enrolment" hidden>
             <p class="auth-hint" data-auth-copy="scanQr">Voeg Briljante Boeke by u verifikasie-app deur die QR-kode te skandeer.</p>
@@ -51,6 +57,8 @@
           </div>
           <label><span data-auth-copy="authenticatorCode">Kode uit u verifikasie-app</span><input name="code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" minlength="6" maxlength="6" required /></label>
           <button class="btn btn-primary btn-full" type="submit" data-auth-copy="verifySignIn">Verifieer en meld aan</button>
+          <button id="staff-mfa-skip" class="auth-link" type="button" data-auth-copy="setUpLater" hidden>Stel later op</button>
+          <button id="staff-mfa-cancel" class="auth-link" type="button" data-auth-copy="backDashboard" hidden>Terug na administrasie</button>
           <p class="auth-hint" data-auth-copy="lostAuthenticator">As u toegang tot u verifikasie-app verloor het, kontak tegniese ondersteuning.</p>
         </form>
         <p id="login-message" class="form-message auth-message" role="alert" aria-live="polite"></p>
@@ -60,7 +68,7 @@
     </main>
 
     <div id="admin-app" class="admin-shell" hidden>
-      <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="fulfilment">Aflewering</button><button data-view="reports">Verslae</button><span>Interne toegang vir Briljante Boeke</span></nav>
+      <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="fulfilment">Aflewering</button><button data-view="reports">Verslae</button><button data-view="security" data-auth-copy="accountSecurity">Rekeningsekuriteit</button><span>Interne toegang vir Briljante Boeke</span></nav>
       <main class="admin-main">
         <section id="view-overview" class="admin-view">
           <div class="admin-title"><div><p class="phase-label">BRILJANTE BOEKE ADMINISTRASIE</p><h1>Oorsig</h1></div><time id="today"></time></div>
@@ -92,6 +100,15 @@
         <section id="view-reports" class="admin-view" hidden>
           <div class="admin-title"><div><p class="phase-label">VERSLAE</p><h1>Betaalde kinderlyste</h1></div></div>
           <article class="data-card report-card"><p>Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.</p><div class="field-pair"><label>Skool<select id="report-school"><option value="">Alle skole</option></select></label><label>Bestelperiode<select id="report-period"><option value="">Alle periodes</option></select></label></div><a id="report-download" class="btn btn-primary" href="/api/admin-export">Laai CSV af</a></article>
+        </section>
+        <section id="view-security" class="admin-view" hidden>
+          <div class="admin-title"><h1 data-auth-copy="accountSecurity">Rekeningsekuriteit</h1></div>
+          <article class="data-card report-card">
+            <h2 data-auth-copy="twoStep">Tweestapverifikasie</h2>
+            <p id="staff-security-status" role="status"></p>
+            <p id="staff-security-hint" class="auth-hint" data-auth-copy="optionalMfa">’n Verifikasie-app beskerm u rekening indien u wagwoord gesteel word. U kan dit nou of later onder Rekeningsekuriteit opstel.</p>
+            <button id="staff-enable-mfa" class="btn btn-primary" type="button" data-auth-copy="enableMfa">Stel tweestapverifikasie op</button>
+          </article>
         </section>
       </main>
     </div>

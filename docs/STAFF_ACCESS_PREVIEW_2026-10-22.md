@@ -1,5 +1,13 @@
 # Staff access preview: 22 October 2026
 
+## Subsequent approved policy: optional initial authenticator setup
+
+After the mandatory-MFA preview below, Nathan explicitly approved a Set up later option after the reduced protection was explained. This supersedes the earlier requirement for every staff member to enrol MFA. Mailbox proof, password setup, active approval, validated provider identity, private application sessions and role checks are unchanged. No domain-wide signup, client invitation or live payment was added.
+
+Users without a verified factor may defer after verified password setup. Account security in the dashboard lets them enable it later; subsequent password logins do not repeatedly force enrolment. Users with any verified factor cannot use the skip endpoint, and protected APIs still require verified TOTP/aal2 for enrolled users. An unverified QR enrolment is not treated as enabled; skipping never removes factors. Ready sessions and email-only setup sessions cannot use the skip endpoint to renew or promote themselves. Fresh provider identity is rechecked before deferral. There are no new database tables or grants, and the legacy staff_users directory remains unused.
+
+Verification for this change: 87 automated tests pass; the loopback-only synthetic UI fixture exercised initial deferral, dashboard entry, Account security, later setup and an enabled status. The setup choice was visually checked on desktop, 768px tablet and 320px mobile with no horizontal overflow at the latter two sizes. No live authenticator key or code was viewed. Live personal setup and account recovery still need the user's own acceptance. No real setup email was sent as part of this change.
+
 ## Implemented
 
 The preview has an email-first sign-in page in English and Afrikaans, retaining the approved Briljante branding. There is no public signup or automatic approval for a domain. Only individually approved, active addresses may receive setup codes. The initial approval is technical@awaldstudio.com; no client invitations have been sent.

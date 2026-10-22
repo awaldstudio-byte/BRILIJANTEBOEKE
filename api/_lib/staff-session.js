@@ -97,12 +97,20 @@ export async function hasStrongFactor(context) {
     context.user.factors?.some(factor => factor.factor_type === 'totp' && factor.status === 'verified') === true;
 }
 
+export function hasEnrolledFactor(user) {
+  // This is the provider-validated user from getUser, never user_metadata or
+  // a browser-supplied preference. Supabase omits factors when none exist.
+  if (user.factors !== undefined && !Array.isArray(user.factors)) throw authDenied();
+  return (user.factors || []).some(factor => factor.status === 'verified');
+}
+
 export async function authorisedStaff(context, roles = ['administrator', 'viewer']) {
-  if (context.record.kind !== 'ready' || !context.approval.password_set_at || !context.approval.setup_completed_at ||
-      !await hasStrongFactor(context)) throw authDenied();
+  if (context.record.kind !== 'ready' || !context.approval.password_set_at || !context.approval.setup_completed_at) throw authDenied();
+  const enrolled = hasEnrolledFactor(context.user);
+  if (enrolled && !await hasStrongFactor(context)) throw authDenied();
   if (!context.approval.active || !roles.includes(context.approval.role)) throw authDenied();
   // Deliberately do not grant legacy staff_users access: older immutable previews
   // consult that directory without the new session and MFA requirements.
   return { user_id: context.user.id, display_name: context.approval.display_name,
-    role: context.approval.role, active: true };
+    role: context.approval.role, active: true, mfa_enabled: enrolled };
 }

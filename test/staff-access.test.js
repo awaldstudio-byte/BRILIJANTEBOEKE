@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStaffLoginHandler } from '../api/admin-login.js';
-import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa, deliverStaffCode } from '../api/_lib/staff-onboarding.js';
+import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa, deliverStaffCode, skipStaffMfa, staffMfaOptions } from '../api/_lib/staff-onboarding.js';
 import { parseCookies, cookie, sessionCookieAge, tokenHash, opaqueToken, loadStaffSession, authorisedStaff } from '../api/_lib/staff-session.js';
 import { readJson } from '../api/_lib/http.js';
 
@@ -67,9 +67,9 @@ test('verified provider identity must match the approved email and app-session u
   const db=database({staff_login_sessions:[record],staff_access_approvals:[approval]});
   await assert.rejects(loadStaffSession({headers:{cookie:`bb_admin_sid=${secret}; bb_admin_access=token`}},response(),{database:db,auth:auth({identity:{...user,id:'stranger'}})}),{statusCode:401});
 });
-test('stage sessions and first-factor-only tokens cannot open protected staff APIs',async()=>{
+test('stage sessions and enrolled accounts without aal2 cannot open protected staff APIs',async()=>{
   const db=database({staff_users:[{user_id:'user',display_name:'Technical',role:'administrator',active:true}]});
-  for(const change of [{record:{...record,kind:'password'}},{auth:auth({level:'aal1'})},{user:{...user,factors:[]}},
+  for(const change of [{record:{...record,kind:'password'}},{auth:auth({level:'aal1'})},
     {approval:{...approval,setup_completed_at:null}}]) {
     await assert.rejects(authorisedStaff({database:db,auth:auth(),record,approval,user,accessToken:'token',...change}),{statusCode:401});
   }
@@ -132,11 +132,11 @@ test('parsed JSON cannot bypass the request size limit',async()=>{
 
 test('existing verified authenticators are challenged and never removed or re-enrolled',async()=>{
   const provider={auth:{setSession:async()=>({data:{user,session:{access_token:'token'}}}),mfa:{
-    listFactors:async()=>({data:{totp:[{id:'existing',status:'verified'}]}}),
+    listFactors:async()=>({data:{all:[{id:'existing',factor_type:'totp',status:'verified'}]}}),
     unenroll(){throw Error('must not remove verified factor');},enroll(){throw Error('must not replace verified factor');}
   }}};
   const result=await beginStaffMfa({auth:provider,user,approval,record:{...record,kind:'password'}});
-  assert.deepEqual(result,{next:'mfa-code',factor_id:'existing',enrolling:false});
+  assert.deepEqual(result,{next:'mfa-code',factor_id:'existing',enrolling:false,can_skip:false});
 });
 
 test('MFA completion never grants the legacy password-only preview directory',async()=>{
@@ -166,4 +166,98 @@ test('a setup code is marked sent only after the fixed sender accepts its intend
     MAIL_REPLY_TO:'info@briljanteboeke.co.za',SMTP_HOST:'smtp.purelymail.com',SMTP_PORT:'465',SMTP_USER:'orders@briljanteboeke.co.za',SMTP_PASSWORD:'synthetic-test-only'},
     transportFactory:()=>({sendMail:async(message)=>{assert.equal(challenge.status,'queued');assert.equal(message.to,approval.email);return {accepted:[approval.email]};},close(){closed=true;}})});
   assert.equal(challenge.status,'sent');assert.equal(closed,true);
+});
+
+function optionalContext({identity={...user,factors:[]},kind='password',complete=false,active=true}={}) {
+  const approved={...approval,active,setup_completed_at:complete?'2026-10-22':null};
+  const staged={...record,kind};
+  const db=database({staff_access_approvals:[approved],staff_login_sessions:[staged]});
+  const provider=auth({identity,level:'aal1'});
+  provider.auth.setSession=async()=>({data:{user:identity,session:{user:identity,access_token:'token',refresh_token:'refresh'}}});
+  provider.auth.mfa.listFactors=async()=>({data:{all:identity.factors||[]}});
+  return {database:db,auth:provider,user:identity,approval:approved,record:staged,secret,accessToken:'token',refreshToken:'refresh'};
+}
+
+test('approved password-verified accounts without an enrolled factor can defer setup',async()=>{
+  const context=optionalContext();const res=response();
+  const result=await skipStaffMfa(context,res);
+  assert.equal(result.next,'dashboard');assert.equal(result.staff.mfa_enabled,false);
+  assert.equal(context.record.kind,'ready');
+  assert.ok(context.approval.setup_completed_at);
+  assert.ok(res.headers['Set-Cookie'].every(value=>/HttpOnly; SameSite=Strict; Secure/.test(value)));
+  assert.ok(context.database.calls.every(call=>call.table!=='staff_users'));
+});
+
+test('an unfinished, unverified TOTP enrolment is not mandatory and is not removed by skipping',async()=>{
+  const context=optionalContext({identity:{...user,factors:[{factor_type:'totp',status:'unverified'}]}});
+  context.auth.auth.mfa.unenroll=()=>{throw Error('must not remove factors on skip');};
+  assert.equal((await skipStaffMfa(context,response())).next,'dashboard');
+});
+
+test('skipping cannot bypass a provider-confirmed enrolled factor, including a newly enabled factor',async()=>{
+  for(const factors of [user.factors,[{factor_type:'phone',status:'verified'}]]) {
+    const context=optionalContext({identity:{...user,factors}});
+    // Stale UI says no factor; the provider's fresh getUser is authoritative.
+    context.user={...user,factors:[]};
+    await assert.rejects(skipStaffMfa(context,response()),{statusCode:409});
+    assert.equal(context.database.calls.length,0);
+  }
+});
+
+test('email verification alone, ready sessions and missing passwords cannot use the skip endpoint',async()=>{
+  for(const kind of ['verified','ready']) await assert.rejects(skipStaffMfa(optionalContext({kind}),response()),{statusCode:401});
+  const context=optionalContext();context.approval.password_set_at=null;
+  await assert.rejects(skipStaffMfa(context,response()),{statusCode:401});
+});
+
+test('disabled approvals and revoked sessions cannot be promoted through skipping',async()=>{
+  await assert.rejects(skipStaffMfa(optionalContext({active:false}),response()),{statusCode:401});
+  const context=optionalContext();context.record.revoked_at='2026-10-22';
+  await assert.rejects(skipStaffMfa(context,response()),{statusCode:401});
+});
+
+test('a completed ready session without MFA can access only its approved role',async()=>{
+  const context=optionalContext({kind:'ready',complete:true});
+  assert.equal((await authorisedStaff(context)).mfa_enabled,false);
+  await assert.rejects(authorisedStaff(context,['viewer']),{statusCode:401});
+  context.user={...user};
+  await assert.rejects(authorisedStaff(context),{statusCode:401});
+});
+
+test('MFA choice does not enrol factors; existing factors require a challenge without skip',async()=>{
+  const context=optionalContext();
+  context.auth.auth.mfa.enroll=()=>{throw Error('choice must not enrol');};
+  assert.deepEqual(await staffMfaOptions(context,response()),{next:'mfa-choice'});
+  const enrolled=optionalContext({identity:{...user,factors:[{id:'existing',factor_type:'totp',status:'verified'}]}});
+  assert.deepEqual(await staffMfaOptions(enrolled,response()),{next:'mfa-code',factor_id:'existing',enrolling:false,can_skip:false});
+});
+
+test('users who previously deferred reach the dashboard after password without another setup prompt',async()=>{
+  const context=optionalContext({complete:true});
+  assert.equal((await staffMfaOptions(context,response())).next,'dashboard');
+});
+
+test('enrolment lookup errors and malformed provider factor records fail closed',async()=>{
+  const context=optionalContext();context.auth.auth.mfa.listFactors=async()=>({error:Error('provider unavailable')});
+  await assert.rejects(staffMfaOptions(context,response()));
+  const malformed=optionalContext({kind:'ready',complete:true,identity:{...user,factors:'invalid'}});
+  await assert.rejects(authorisedStaff(malformed),{statusCode:401});
+});
+
+test('the skip HTTP route ignores browser claims and rejects an enabled authenticator',async()=>{
+  const context=optionalContext({identity:user});const res=response();
+  const handler=createStaffLoginHandler({databaseFactory:()=>context.database,authFactory:()=>context.auth});
+  await handler({method:'POST',headers:{origin:process.env.APP_ORIGIN,cookie:`bb_admin_sid=${secret}; bb_admin_access=token; bb_admin_refresh=refresh`},
+    body:{action:'mfa-skip',mfa_enabled:false,enrolling:false,role:'administrator'}},res);
+  assert.equal(res.code,409);
+  assert.equal(context.record.kind,'password');
+  assert.equal(res.headers['Set-Cookie'],undefined);
+});
+
+test('deferral rejects a changed or unconfirmed provider identity before updating approval',async()=>{
+  for(const changed of [{...user,factors:[],id:'other'},{...user,factors:[],email_confirmed_at:null}]){
+    const context=optionalContext();context.auth.auth.getUser=async()=>({data:{user:changed}});
+    await assert.rejects(skipStaffMfa(context,response()),{statusCode:401});
+    assert.equal(context.database.calls.length,0);
+  }
 });

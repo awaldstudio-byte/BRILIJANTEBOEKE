@@ -4,7 +4,7 @@ import { assertDatabaseResult } from './supabase.js';
 import { mailSettings, createMailTransport } from './order-mail.js';
 import { staffVerificationContent } from './staff-email.js';
 import { authCookies, opaqueToken, tokenHash, parseCookies, cookie, appendCookie,
-  createStaffSession, attachProviderSession, setSessionCookies, hasStrongFactor, authDenied } from './staff-session.js';
+  createStaffSession, attachProviderSession, setSessionCookies, hasStrongFactor, hasEnrolledFactor, authDenied } from './staff-session.js';
 
 export function normaliseStaffEmail(value) {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -140,13 +140,45 @@ export async function setStaffPassword(context, res, password, confirmation) {
   return { next: 'mfa' };
 }
 
+export async function staffMfaOptions(context, res) {
+  if (!context.approval.password_set_at || !['password', 'ready'].includes(context.record.kind)) throw authDenied();
+  await attachProviderSession(context);
+  const listed = await context.auth.auth.mfa.listFactors();
+  if (listed.error || !Array.isArray(listed.data?.all)) throw new Error('Authenticator lookup failed.');
+  const verified = listed.data.all.find(factor => factor.status === 'verified');
+  if (verified) {
+    if (verified.factor_type !== 'totp') throw Object.assign(new Error('Contact technical support to use the verification method enabled on this account.'), { statusCode: 409 });
+    return { next: 'mfa-code', factor_id: verified.id, enrolling: false, can_skip: false };
+  }
+  // Once an approved user has deferred setup, ordinary password logins should
+  // not keep forcing the setup prompt. They can enable MFA in Account security.
+  if (context.record.kind === 'password' && context.approval.setup_completed_at) return skipStaffMfa(context, res);
+  return { next: 'mfa-choice' };
+}
+
+export async function skipStaffMfa(context, res) {
+  if (!context.approval.password_set_at || context.record.kind !== 'password') throw authDenied();
+  const session = await attachProviderSession(context);
+  const checked = await context.auth.auth.getUser(session.access_token);
+  if (checked.error || checked.data.user?.id !== context.user.id ||
+      checked.data.user.email?.toLowerCase() !== context.approval.email || !checked.data.user.email_confirmed_at) throw authDenied();
+  if (hasEnrolledFactor(checked.data.user)) {
+    throw Object.assign(new Error('Two-step verification is already enabled. Enter your authenticator code to continue.'), { statusCode: 409 });
+  }
+  return completeStaffAccess({ ...context, user: checked.data.user }, res, session);
+}
+
 export async function beginStaffMfa(context) {
   if (!context.approval.password_set_at || !['password', 'ready'].includes(context.record.kind)) throw authDenied();
   await attachProviderSession(context);
   const listed = await context.auth.auth.mfa.listFactors();
   if (listed.error) throw new Error('Authenticator lookup failed.');
-  const verified = listed.data.totp?.find(factor => factor.status === 'verified');
-  if (verified) return { next: 'mfa-code', factor_id: verified.id, enrolling: false };
+  if (!Array.isArray(listed.data?.all)) throw new Error('Authenticator lookup failed.');
+  const verified = listed.data.all.find(factor => factor.status === 'verified');
+  if (verified) {
+    if (verified.factor_type !== 'totp') throw Object.assign(new Error('Contact technical support to use the verification method enabled on this account.'), { statusCode: 409 });
+    return { next: 'mfa-code', factor_id: verified.id, enrolling: false, can_skip: false };
+  }
   for (const factor of listed.data.all || []) {
     if (factor.factor_type === 'totp' && factor.status === 'unverified') {
       const removed = await context.auth.auth.mfa.unenroll({ factorId: factor.id });
@@ -155,7 +187,8 @@ export async function beginStaffMfa(context) {
   }
   const enrolled = await context.auth.auth.mfa.enroll({ factorType: 'totp', issuer: 'Briljante Boeke', friendlyName: 'Briljante staff authenticator' });
   if (enrolled.error || !enrolled.data?.totp?.qr_code?.startsWith('data:image/svg+xml')) throw new Error('Authenticator enrolment failed.');
-  return { next: 'mfa-code', factor_id: enrolled.data.id, enrolling: true, qr_code: enrolled.data.totp.qr_code, manual_key: enrolled.data.totp.secret };
+  return { next: 'mfa-code', factor_id: enrolled.data.id, enrolling: true, can_skip: context.record.kind === 'password',
+    can_cancel: context.record.kind === 'ready', qr_code: enrolled.data.totp.qr_code, manual_key: enrolled.data.totp.secret };
 }
 
 export async function finishStaffMfa(context, res, factorId, code) {
@@ -167,18 +200,22 @@ export async function finishStaffMfa(context, res, factorId, code) {
   const checked = await context.auth.auth.getUser(result.data.access_token);
   if (checked.error || checked.data.user?.id !== context.user.id) throw authDenied();
   if (!await hasStrongFactor({ ...context, accessToken: result.data.access_token, user: checked.data.user })) throw authDenied();
+  return completeStaffAccess({ ...context, user: checked.data.user }, res, result.data);
+}
+
+async function completeStaffAccess(context, res, session) {
   const approval = await approvedEmail(context.database, context.approval.email);
-  if (!approval || approval.id !== context.approval.id || approval.auth_user_id !== context.user.id) throw authDenied();
+  if (!approval || !approval.password_set_at || approval.id !== context.approval.id || approval.auth_user_id !== context.user.id) throw authDenied();
   const staff = { user_id: context.user.id, display_name: approval.display_name, role: approval.role, active: true };
   // The private approval directory is authoritative. Never activate the legacy
   // staff_users directory, which would unlock older password-only previews.
-  const completed = await context.database.from('staff_access_approvals').update({ setup_completed_at: new Date().toISOString() }).eq('id', approval.id).eq('active', true);
+  const completed = await context.database.from('staff_access_approvals').update({ setup_completed_at: approval.setup_completed_at || new Date().toISOString() }).eq('id', approval.id).eq('active', true);
   assertDatabaseResult(completed.error);
   const ready = { ...context.record, kind: 'ready', expires_at: new Date(Date.now() + (context.record.remember ? 30 * 86400_000 : 8 * 3600_000)).toISOString() };
   const stored = await context.database.from('staff_login_sessions').update({ kind: ready.kind, expires_at: ready.expires_at })
     .eq('token_hash', context.record.token_hash).is('revoked_at', null).select('token_hash').maybeSingle();
   assertDatabaseResult(stored.error);
   if (!stored.data) throw authDenied();
-  setSessionCookies(res, result.data, ready, context.secret);
-  return { next: 'dashboard', staff: { display_name: staff.display_name, role: staff.role } };
+  setSessionCookies(res, session, ready, context.secret);
+  return { next: 'dashboard', staff: { display_name: staff.display_name, role: staff.role, mfa_enabled: hasEnrolledFactor(context.user) } };
 }

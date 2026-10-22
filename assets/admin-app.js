@@ -49,6 +49,7 @@ applyLanguage();
 document.querySelector('input[name="class_required"]')?.closest("label")?.remove();
 $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 const staffAccess = initStaffAccess({ language, onAuthenticated: async staff => { showAdmin(staff); await loadData(); } });
+$('#staff-enable-mfa').addEventListener('click', () => { if (!preview) staffAccess.startSetup(); });
 init();
 
 async function init() {
@@ -82,6 +83,12 @@ function showAdmin(staff) {
   $("#admin-user").hidden = false;
   $("#user-name").textContent = staff.display_name;
   $("#user-initial").textContent = staff.display_name.charAt(0).toUpperCase();
+  $('#staff-security-status').textContent = staff.mfa_enabled
+    ? tr('Aangeskakel. U verifikasie-app word by aanmelding vereis.', 'Enabled. Your authenticator is required when signing in.')
+    : tr('Nog nie opgestel nie. U meld tans met u wagwoord aan.', 'Not set up yet. You currently sign in with your password.');
+  $('#staff-enable-mfa').hidden = staff.mfa_enabled === true;
+  $('#staff-security-hint').hidden = staff.mfa_enabled === true;
+  $('#staff-enable-mfa').disabled = preview;
 }
 
 async function loadData() {

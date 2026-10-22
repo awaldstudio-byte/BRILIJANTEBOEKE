@@ -5,7 +5,7 @@ import { serviceClient, publicAuthClient, assertDatabaseResult } from './_lib/su
 import { clearSessionCookies, parseCookies, authCookies, tokenHash, loadStaffSession,
   createStaffSession, authorisedStaff } from './_lib/staff-session.js';
 import { normaliseStaffEmail, approvedEmail, limitStaffRequest, requestStaffCode, verifyStaffCode,
-  setStaffPassword, beginStaffMfa, finishStaffMfa } from './_lib/staff-onboarding.js';
+  setStaffPassword, beginStaffMfa, finishStaffMfa, staffMfaOptions, skipStaffMfa } from './_lib/staff-onboarding.js';
 
 export function createStaffLoginHandler({ databaseFactory = serviceClient, authFactory = publicAuthClient, schedule = waitUntil } = {}) {
   return async function handler(req, res) {
@@ -26,7 +26,7 @@ export function createStaffLoginHandler({ databaseFactory = serviceClient, authF
       const body = await readJson(req, 8_000);
       if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'Invalid account request.' });
       const action = typeof body.action === 'string' ? body.action : 'password';
-      if (!['password', 'request-code', 'verify-code', 'status', 'new-password', 'mfa-begin', 'mfa-verify'].includes(action)) {
+      if (!['password', 'request-code', 'verify-code', 'status', 'new-password', 'mfa-options', 'mfa-begin', 'mfa-verify', 'mfa-skip'].includes(action)) {
         return json(res, 400, { error: 'Invalid account action.' });
       }
       const email = ['password', 'request-code'].includes(action) ? normaliseStaffEmail(body.email) : '';
@@ -44,6 +44,8 @@ export function createStaffLoginHandler({ databaseFactory = serviceClient, authF
       }
       const context = await loadStaffSession(req, res, { database, auth });
       if (action === 'new-password') return json(res, 200, await setStaffPassword(context, res, body.password, body.confirmation));
+      if (action === 'mfa-options') return json(res, 200, await staffMfaOptions(context, res));
+      if (action === 'mfa-skip') return json(res, 200, await skipStaffMfa(context, res));
       if (action === 'mfa-begin') return json(res, 200, await beginStaffMfa(context));
       if (action === 'mfa-verify') return json(res, 200, await finishStaffMfa(context, res, body.factor_id, body.code));
       if (context.record.kind === 'verified') return json(res, 200, { next: 'new-password' });

@@ -1,5 +1,7 @@
 # Staff access and automated email requirements
 
+Latest approved access policy, 22 October 2026: Nathan approved optional initial authenticator enrolment after its security trade-off was explained. Set up later is available only before a factor is verified. Enrolled accounts must still complete their challenge at login. Account security provides later enrolment; no MFA disable/removal control has been added. Approved-email, mailbox verification, password and server-side session/role checks remain compulsory. This supersedes earlier mandatory-enrolment language below; see STAFF_ACCESS_PREVIEW_2026-10-22.md for implementation and tested boundaries.
+
 This is an implementation and acceptance plan, not a statement that these flows are complete.
 
 ## Source decisions
