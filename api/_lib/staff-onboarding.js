@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { env } from './env.js';
 import { assertDatabaseResult } from './supabase.js';
 import { mailSettings, createMailTransport } from './order-mail.js';
+import { staffVerificationContent } from './staff-email.js';
 import { authCookies, opaqueToken, tokenHash, parseCookies, cookie, appendCookie,
   createStaffSession, attachProviderSession, setSessionCookies, hasStrongFactor, authDenied } from './staff-session.js';
 
@@ -47,10 +48,7 @@ export function staffCodeMessage(email, code, settings) {
   if (!/^\d{6,10}$/.test(code)) throw new Error('Invalid provider code.');
   return { from: { name: 'Briljante Boeke', address: settings.from }, to: normaliseStaffEmail(email), replyTo: settings.replyTo,
     subject: 'Briljante Boeke — account verification / rekeningverifikasie',
-    text: `Your account verification code / U rekeningverifikasiekode:\n\n${code}\n\n` +
-      'Enter this code on the Briljante Boeke administration page where you requested it. It expires in 15 minutes and can be used once.\n' +
-      'Voer die kode op die Briljante Boeke-administrasieblad in waar u dit aangevra het. Dit verval oor 15 minute en kan een keer gebruik word.\n\n' +
-      'Do not share this code. If you did not request it, ignore this email.\nMoenie hierdie kode deel nie. Ignoreer hierdie e-pos indien u dit nie aangevra het nie.',
+    ...staffVerificationContent(code, settings.replyTo || 'info@briljanteboeke.co.za'),
     disableFileAccess: true, disableUrlAccess: true };
 }
 

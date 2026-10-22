@@ -2,7 +2,7 @@
   "cleanUrls": false,
   "trailingSlash": true,
   "functions": {
-    "api/admin-login.js": { "maxDuration": 120 },
+    "api/admin-login.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
     "api/payfast-notify.js": { "maxDuration": 120 }
   },
   "headers": [
