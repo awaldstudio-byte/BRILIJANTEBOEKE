@@ -4,7 +4,7 @@ import { json, methodNotAllowed, publicError, readJson } from './_lib/http.js';
 import { serviceClient, publicAuthClient, assertDatabaseResult } from './_lib/supabase.js';
 import { clearSessionCookies, parseCookies, authCookies, tokenHash, loadStaffSession,
   createStaffSession, authorisedStaff } from './_lib/staff-session.js';
-import { normaliseStaffEmail, approvedEmail, limitStaffRequest, requestStaffCode, verifyStaffCode,
+import { normaliseStaffEmail, approvedEmail, checkStaffEmail, limitStaffRequest, requestStaffCode, verifyStaffCode,
   setStaffPassword, beginStaffMfa, finishStaffMfa, staffMfaOptions, skipStaffMfa } from './_lib/staff-onboarding.js';
 
 export function createStaffLoginHandler({ databaseFactory = serviceClient, authFactory = publicAuthClient, schedule = waitUntil } = {}) {
@@ -26,11 +26,12 @@ export function createStaffLoginHandler({ databaseFactory = serviceClient, authF
       const body = await readJson(req, 8_000);
       if (!body || typeof body !== 'object' || Array.isArray(body)) return json(res, 400, { error: 'Invalid account request.' });
       const action = typeof body.action === 'string' ? body.action : 'password';
-      if (!['password', 'request-code', 'verify-code', 'status', 'new-password', 'mfa-options', 'mfa-begin', 'mfa-verify', 'mfa-skip'].includes(action)) {
+      if (!['email-check', 'password', 'request-code', 'verify-code', 'status', 'new-password', 'mfa-options', 'mfa-begin', 'mfa-verify', 'mfa-skip'].includes(action)) {
         return json(res, 400, { error: 'Invalid account action.' });
       }
-      const email = ['password', 'request-code'].includes(action) ? normaliseStaffEmail(body.email) : '';
+      const email = ['email-check', 'password', 'request-code'].includes(action) ? normaliseStaffEmail(body.email) : '';
       if (action !== 'status') await limitStaffRequest(database, req, action, email);
+      if (action === 'email-check') return json(res, 200, await checkStaffEmail(database, email));
       if (action === 'request-code') return json(res, 200, await requestStaffCode(database, res, email, body.remember, schedule));
       if (action === 'verify-code') return json(res, 200, await verifyStaffCode(database, auth, req, res, body.code));
       if (action === 'password') {

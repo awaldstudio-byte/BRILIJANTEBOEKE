@@ -31,6 +31,15 @@ export async function approvedEmail(database, email) {
   return result.data;
 }
 
+export const staffEmailDenied = () => Object.assign(new Error('Unable to continue with this email address. Check the spelling or contact technical support.'), { statusCode: 403 });
+
+export async function checkStaffEmail(database, email) {
+  const approval = await approvedEmail(database, email);
+  if (!approval) throw staffEmailDenied();
+  // This is routing only, never authentication or account creation.
+  return { next: approval.auth_user_id && approval.password_set_at ? 'password' : 'setup' };
+}
+
 export async function limitStaffRequest(database, req, action, email = '') {
   const ip = String(req.headers['x-vercel-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   const hash = value => createHmac('sha256', env().orderTokenSecret).update(`staff-auth:${value}`).digest('hex');
@@ -83,13 +92,13 @@ export async function deliverStaffCode(database, approval, challengeHash, { sour
 export async function requestStaffCode(database, res, email, remember, schedule, deliver = deliverStaffCode) {
   if (process.env.AUTH_MAIL_ENABLED !== 'true') throw Object.assign(new Error('Account setup is not available yet.'), { statusCode: 503 });
   const approval = await approvedEmail(database, email);
+  if (!approval) throw staffEmailDenied();
   const secret = opaqueToken();
   const hash = tokenHash(secret);
-  const result = await database.from('staff_setup_challenges').insert({ token_hash: hash, approval_id: approval?.id || null, remember: remember === true });
+  const result = await database.from('staff_setup_challenges').insert({ token_hash: hash, approval_id: approval.id, remember: remember === true });
   assertDatabaseResult(result.error);
   appendCookie(res, cookie(authCookies.challenge, secret, { maxAge: 900 }));
-  // Unknown emails have the same response/cookie/database path; no outbound message.
-  if (approval) schedule(deliver(database, approval, hash));
+  schedule(deliver(database, approval, hash));
   return { next: 'code', message: 'If this address is approved, a verification code will be sent. Check your inbox and spam folder.' };
 }
 

@@ -19,17 +19,19 @@ export function initStaffAccess({ language, onAuthenticated }) {
     enableMfa:['Stel tweestapverifikasie op','Set up two-step verification'],setUpLater:['Stel later op','Set up later'],
     accountSecurity:['Rekeningsekuriteit','Account security'],twoStep:['Tweestapverifikasie','Two-step verification'],
     backDashboard:['Terug na administrasie','Back to dashboard'],
+    sendCode:['Stuur verifikasiekode','Send verification code'],
   };
   for (const node of document.querySelectorAll('[data-auth-copy]')) node.textContent = copy[node.dataset.authCopy][en ? 1 : 0];
   for (const node of document.querySelectorAll('[data-toggle-password]')) node.textContent = en ? 'Show' : 'Wys';
-  let email = '', factorId = '', busy = false, resendAfter = 0, fromDashboard = false;
+  let email = '', factorId = '', busy = false, resendAfter = 0, fromDashboard = false, setupRemember = false;
   const text = (af, english) => en ? english : af;
-  const forms = { email: $('#staff-email-form'), password: $('#staff-password-form'), code: $('#staff-code-form'),
+  const forms = { email: $('#staff-email-form'), setup: $('#staff-setup-form'), password: $('#staff-password-form'), code: $('#staff-code-form'),
     'new-password': $('#staff-new-password-form'), 'mfa-choice': $('#staff-mfa-choice'), 'mfa-code': $('#staff-mfa-form') };
-  const headings = { email: text('Meld aan','Sign in'), password: text('Voer u wagwoord in','Enter your password'),
+  const headings = { email: text('Meld aan','Sign in'), setup: text('Stel u personeeltoegang op','Set up your staff access'), password: text('Voer u wagwoord in','Enter your password'),
     code: text('Verifieer u e-posadres','Verify your email'), 'new-password':text('Stel u wagwoord op','Set your password'),
     'mfa-code':text('Tweestapverifikasie','Two-step verification'), 'mfa-choice':text('Tweestapverifikasie','Two-step verification') };
   const intros = { email:text('Voer u goedgekeurde e-posadres in om voort te gaan.','Enter your approved email address to continue.'),
+    setup:text('U e-posadres is goedgekeur. Verifieer eers u e-posadres; daarna kan u ’n veilige wagwoord kies.','Your email address is approved. Verify your email first, then choose a secure password.'),
     password:text('Gebruik u wagwoord, of kies rekeningopstelling vir eerste toegang.','Use your password, or choose account setup for first-time access.'),
     code:text('Indien hierdie adres goedgekeur is, sal ’n kode gestuur word. Kyk ook in u strooipos. Die kode verval oor 15 minute.','If this address is approved, a code will be sent. Check your inbox and spam folder. The code expires in 15 minutes.'),
     'new-password':text('U e-posadres is geverifieer. Kies ’n unieke wagwoord.','Your email is verified. Choose a unique password.'),
@@ -51,7 +53,10 @@ export function initStaffAccess({ language, onAuthenticated }) {
       const response = await fetch('/api/admin-login', { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action,...values}), signal:controller.signal });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || text('Meld asseblief weer aan.','Please sign in again.'));
+      if (!response.ok) {
+        if(action==='email-check'&&response.status===403)throw new Error(text('Kan nie met hierdie e-posadres voortgaan nie. Kontroleer die spelling of kontak tegniese ondersteuning.','Unable to continue with this email address. Check the spelling or contact technical support.'));
+        throw new Error(data.error || text('Meld asseblief weer aan.','Please sign in again.'));
+      }
       return data;
     } finally { clearTimeout(timeout); }
   }
@@ -91,8 +96,12 @@ export function initStaffAccess({ language, onAuthenticated }) {
     if (forms[result.next]) stage(result.next);
   }
   forms.email.addEventListener('submit', event => {
-    event.preventDefault(); email = $('#staff-email').value.trim().toLowerCase();
-    stage('password'); $('#staff-password').focus();
+    event.preventDefault(); run(async () => {
+      email = $('#staff-email').value.trim().toLowerCase();
+      const result=await request('email-check',{email});
+      await next(result);
+      if(result.next==='password')$('#staff-password').focus();
+    });
   });
   forms.password.addEventListener('submit', event => {
     event.preventDefault(); run(async () => {
@@ -103,10 +112,13 @@ export function initStaffAccess({ language, onAuthenticated }) {
   });
   async function sendCode() {
     if (Date.now() < resendAfter) throw new Error(text('Wag asseblief ’n minuut voordat u weer ’n kode aanvra.','Please wait a minute before requesting another code.'));
-    const result = await request('request-code',{email,remember:$('#staff-remember').checked});
+    if(!forms.setup.hidden)setupRemember=$('#staff-setup-remember').checked;
+    else if(!forms.password.hidden)setupRemember=$('#staff-remember').checked;
+    const result = await request('request-code',{email,remember:setupRemember});
     resendAfter = Date.now() + 60000; $('#staff-password').value = ''; await next(result);
   }
   $('#staff-request-code').addEventListener('click',() => run(sendCode));
+  forms.setup.addEventListener('submit',event=>{event.preventDefault();run(sendCode);});
   $('#staff-resend-code').addEventListener('click',() => run(sendCode));
   forms.code.addEventListener('submit',event => { event.preventDefault(); run(async () => {
     const code = $('#staff-email-code').value; $('#staff-email-code').value = '';
@@ -126,7 +138,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
   for (const id of ['#staff-choice-skip','#staff-mfa-skip']) $(id).addEventListener('click',() => run(async () => next(await request('mfa-skip'))));
   for (const id of ['#staff-choice-cancel','#staff-mfa-cancel']) $(id).addEventListener('click',() => run(async () => next(await request('status'))));
   for (const button of document.querySelectorAll('[data-auth-start-over]')) button.addEventListener('click',() => {
-    email = ''; forms.password.reset(); stage('email'); $('#staff-email').focus();
+    email = ''; setupRemember = false; forms.password.reset(); forms.setup.reset(); stage('email'); $('#staff-email').focus();
   });
   for (const button of document.querySelectorAll('[data-toggle-password]')) button.addEventListener('click',() => {
     const field = document.getElementById(button.dataset.togglePassword);

@@ -23,6 +23,12 @@
           <label><span data-auth-copy="email">E-posadres</span><input id="staff-email" name="email" type="email" autocomplete="username" inputmode="email" maxlength="254" required /></label>
           <button class="btn btn-primary btn-full" type="submit" data-auth-copy="continue">Gaan voort</button>
         </form>
+        <form id="staff-setup-form" class="auth-step" method="post" hidden>
+          <label class="checkbox-field"><input id="staff-setup-remember" type="checkbox" /><span data-auth-copy="remember">Onthou hierdie toestel vir 30 dae</span></label>
+          <p class="auth-hint" data-auth-copy="sharedDevice">Moenie hierdie opsie op ’n gedeelde of openbare toestel gebruik nie.</p>
+          <button class="btn btn-primary btn-full" type="submit" data-auth-copy="sendCode">Stuur verifikasiekode</button>
+          <button class="auth-link" type="button" data-auth-start-over data-auth-copy="differentEmail">Gebruik ’n ander e-posadres</button>
+        </form>
         <form id="staff-password-form" class="auth-step" method="post" hidden>
           <label><span data-auth-copy="password">Wagwoord</span><span class="auth-password-control"><input id="staff-password" name="password" type="password" autocomplete="current-password" maxlength="200" required /><button type="button" data-toggle-password="staff-password" aria-pressed="false">Wys</button></span></label>
           <label class="checkbox-field"><input id="staff-remember" type="checkbox" /><span data-auth-copy="remember">Onthou hierdie toestel vir 30 dae</span></label>
@@ -68,6 +74,7 @@
     </main>
 
     <div id="admin-app" class="admin-shell" hidden>
+      <div id="admin-notices" class="admin-notices" role="status"></div>
       <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="years">Akademiese jare</button><button data-view="fulfilment">Aflewering</button><button data-view="reports">Verslae</button><button data-view="security" data-auth-copy="accountSecurity">Rekeningsekuriteit</button><span>Interne toegang vir Briljante Boeke</span></nav>
       <main class="admin-main">
         <section id="view-overview" class="admin-view">

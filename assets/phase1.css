@@ -125,8 +125,13 @@ input:focus, select:focus, textarea:focus { border-color: var(--turquoise); box-
 .status-card dt { color: var(--muted); }
 .status-card dd { margin: 0; color: var(--navy); font-weight: 700; }
 
-.admin-page { background: var(--soft); }
-.admin-header { height: 80px; background: var(--navy); color: white; padding: 0 34px; display: flex; justify-content: space-between; align-items: center; }
+.admin-page { background: var(--soft); height: 100vh; height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+.admin-header { min-height: 80px; flex: 0 0 auto; background: var(--navy); color: white; padding: 0 34px; display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.admin-brand { min-width: 0; }
+.admin-brand span { overflow-wrap: anywhere; }
+.admin-page .header-actions { flex-shrink: 0; }
+.admin-user > #user-name { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-page .login-shell { flex: 1; min-height: 0; overflow-y: auto; }
 .admin-brand { display: flex; align-items: center; gap: 24px; font-size: 1.15rem; font-weight: 700; }
 .admin-brand img { width: 165px; max-height: 68px; object-fit: contain; }
 .admin-brand span { border-left: 1px solid rgba(255, 255, 255, .45); padding-left: 24px; }
@@ -158,12 +163,14 @@ input:focus, select:focus, textarea:focus { border-color: var(--turquoise); box-
 .auth-qr { display: block; width: 200px; max-width: 100%; height: auto; padding: 10px; background: white; margin: 0 auto 18px; }
 .auth-step details { font-size: .8rem; color: var(--navy); margin-bottom: 20px; }
 .auth-step details input { font-family: monospace; font-size: .8rem; }
-.admin-shell { min-height: calc(100vh - 80px); display: grid; grid-template-columns: 225px minmax(0, 1fr); }
-.admin-nav { border-right: 1px solid var(--line); background: white; padding: 28px 0; }
+.admin-shell { flex: 1; min-height: 0; display: grid; grid-template-columns: 225px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: 'notices notices' 'navigation content'; }
+.admin-notices { grid-area: notices; min-width: 0; max-height: min(25vh, 140px); overflow-y: auto; }
+.admin-notices > .notice { margin: 0; padding: 10px 24px; border-bottom: 1px solid var(--line); font-size: .82rem; line-height: 1.5; }
+.admin-nav { grid-area: navigation; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; border-right: 1px solid var(--line); background: white; padding: 28px 0; }
 .admin-nav button { width: 100%; padding: 13px 25px; border: 0; border-left: 4px solid transparent; background: transparent; color: var(--body); text-align: left; cursor: pointer; }
 .admin-nav button:hover, .admin-nav button.active { border-left-color: var(--turquoise); background: #eaf6fb; color: var(--navy); }
 .admin-nav span { margin: 35px 25px 0; border-top: 1px solid var(--line); padding-top: 18px; display: block; color: var(--muted); font-size: .74rem; }
-.admin-main { min-width: 0; padding: 30px; }
+.admin-main { grid-area: content; min-width: 0; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 30px; }
 .admin-title { display: flex; justify-content: space-between; align-items: start; gap: 24px; }
 .admin-title h1 { font-size: 2.35rem; }
 .admin-title time { color: var(--muted); font-size: .85rem; }
@@ -231,6 +238,7 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
   .order-grid { grid-template-columns: minmax(0, 1fr) 370px; }
   .book-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .admin-shell { grid-template-columns: 185px minmax(0, 1fr); }
+  .admin-user > #user-name { display: none; }
   .metric-grid { grid-template-columns: repeat(2, 1fr); }
   .admin-content-grid { grid-template-columns: 1fr; }
   .school-admin-grid { grid-template-columns: 1fr; }
@@ -259,8 +267,9 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
   .admin-header { padding: 0 18px; }
   .admin-brand img { width: 135px; }
   .admin-brand span, .admin-user > span:not(.user-initial) { display: none; }
-  .admin-shell { display: block; }
-  .admin-nav { padding: 7px 10px; display: flex; overflow-x: auto; }
+  .admin-shell { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto minmax(0, 1fr); grid-template-areas: 'notices' 'navigation' 'content'; }
+  .admin-nav { padding: 7px 10px; display: flex; overflow-x: auto; overflow-y: hidden; }
+  .admin-notices > .notice { padding: 9px 14px; }
   .admin-nav button { width: auto; padding: 9px 12px; border-left: 0; border-bottom: 3px solid transparent; white-space: nowrap; }
   .admin-nav button.active { border-bottom-color: var(--turquoise); }
   .admin-nav span { display: none; }

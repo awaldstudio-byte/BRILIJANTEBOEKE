@@ -67,7 +67,7 @@ async function init() {
     const notice = document.createElement('p');
     notice.className = 'notice';
     notice.textContent = tr('Demonstrasie: slegs voorbeelddata. Geen toegang tot werklike rekords nie.', 'Demonstration: sample data only. No access to real records.');
-    $('#admin-app').prepend(notice);
+    $('#admin-notices').append(notice);
     showAdmin({ display_name: "Briljante", role: "administrator" });
     await loadData();
     return;
@@ -112,7 +112,7 @@ async function loadData() {
   state.orders = orders.orders;
   state.batches = fulfilment.batches;
   let demoNotice = $('#demo-data-notice');
-  if (!demoNotice) { demoNotice = document.createElement('p'); demoNotice.id = 'demo-data-notice'; demoNotice.className = 'notice'; $('#admin-app').prepend(demoNotice); }
+  if (!demoNotice) { demoNotice = document.createElement('p'); demoNotice.id = 'demo-data-notice'; demoNotice.className = 'notice'; $('#admin-notices').append(demoNotice); }
   demoNotice.hidden = dashboard.demo_mode !== true;
   demoNotice.textContent = tr('Toetsomgewing: DEMO-bestellings tel in hierdie voorskou se syfers, maar geen geld is ontvang nie. DEMO-bedrae word uitgesluit van die finansiële oorsig wanneer die toetsmodus afgeskakel word.', 'Testing environment: DEMO orders are included in these preview figures, but no money was received. DEMO amounts are excluded from the financial overview when test mode is disabled.');
   renderOverview();
@@ -223,7 +223,7 @@ $("#metric-grid").addEventListener("click", async (event) => {
 function setView(view) {
   document.querySelectorAll(".admin-view").forEach((section) => { section.hidden = section.id !== `view-${view}`; });
   document.querySelectorAll(".admin-nav [data-view]").forEach((button) => button.classList.toggle("active", button.dataset.view === view));
-  scrollTo({ top: 0, behavior: "smooth" });
+  $('.admin-main').scrollTo({ top: 0, left: 0, behavior: 'instant' });
 }
 
 $("#order-filters").addEventListener("submit", async (event) => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createStaffLoginHandler } from '../api/admin-login.js';
-import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa, deliverStaffCode, skipStaffMfa, staffMfaOptions } from '../api/_lib/staff-onboarding.js';
+import { normaliseStaffEmail, validateNewStaffPassword, requestStaffCode, checkStaffEmail, verifyStaffCode, staffCodeMessage, setStaffPassword, limitStaffRequest, beginStaffMfa, finishStaffMfa, deliverStaffCode, skipStaffMfa, staffMfaOptions } from '../api/_lib/staff-onboarding.js';
 import { parseCookies, cookie, sessionCookieAge, tokenHash, opaqueToken, loadStaffSession, authorisedStaff } from '../api/_lib/staff-session.js';
 import { readJson } from '../api/_lib/http.js';
 
@@ -82,16 +82,33 @@ test('verified MFA plus an approved role grants access without activating legacy
   await assert.rejects(authorisedStaff({...context,approval:{...approval,role:'viewer'}},['administrator']),{statusCode:401});
   await assert.rejects(authorisedStaff({...context,approval:{...approval,active:false}}),{statusCode:401});
 });
-test('setup request gives unknown and approved addresses the same public response and never emails unknown users',async()=>{
-  let scheduled=0;const bodies=[];
-  for(const known of [false,true]){
-    const db=database({staff_access_approvals:known?[approval]:[]});const res=response();
-    bodies.push(await requestStaffCode(db,res,known?approval.email:'unknown@briljanteboeke.co.za',false,()=>{scheduled++;},async()=>{}));
-    assert.match(res.headers['Set-Cookie'][0],/^bb_setup_challenge=[a-f0-9]{64};/);
-    const row=db.calls.find(call=>call.insert).insert;
-    assert.match(row.token_hash,/^[a-f0-9]{64}$/);assert.equal('code' in row,false);
+test('unapproved and disabled addresses cannot create setup challenges or send mail',async()=>{
+  for(const rows of [[],[{...approval,active:false}]]){
+    let scheduled=0;const db=database({staff_access_approvals:rows}),res=response();
+    await assert.rejects(requestStaffCode(db,res,approval.email,false,()=>{scheduled++;},async()=>{}),{statusCode:403});
+    assert.equal(scheduled,0);assert.equal(res.headers['Set-Cookie'],undefined);assert.equal(db.calls.some(call=>call.insert),false);
   }
-  assert.deepEqual(bodies[0],bodies[1]);assert.equal(scheduled,1);
+  let scheduled=0;const db=database({staff_access_approvals:[approval]}),res=response();
+  assert.equal((await requestStaffCode(db,res,approval.email,false,()=>{scheduled++;},async()=>{})).next,'code');
+  assert.match(res.headers['Set-Cookie'][0],/^bb_setup_challenge=[a-f0-9]{64};/);
+  const row=db.calls.find(call=>call.insert).insert;assert.match(row.token_hash,/^[a-f0-9]{64}$/);assert.equal('code' in row,false);assert.equal(scheduled,1);
+});
+
+test('email-first gate routes only approved addresses without returning private profile data',async()=>{
+  for(const [entry,next]of[[approval,'password'],[{...approval,password_set_at:null},'setup'],[{...approval,auth_user_id:null,password_set_at:null},'setup']]){
+    const db=database({staff_access_approvals:[entry]});assert.deepEqual(await checkStaffEmail(db,entry.email),{next});assert.equal(db.calls.some(call=>call.insert||call.mutation),false);
+  }
+  for(const rows of [[],[{...approval,active:false}]])await assert.rejects(checkStaffEmail(database({staff_access_approvals:rows}),approval.email),{statusCode:403});
+});
+
+test('email-first HTTP check is origin-protected, rate-limited and cannot authenticate or email a user',async()=>{
+  for(const [rows,status,next]of[[[],403,undefined],[[approval],200,'password'],[[{...approval,password_set_at:null}],200,'setup']]){
+    const db=database({staff_access_approvals:rows});let sent=0;const handler=createStaffLoginHandler({databaseFactory:()=>db,authFactory:()=>({}),schedule:()=>{sent++;}}),res=response();
+    await handler({method:'POST',headers:{origin:process.env.APP_ORIGIN},body:{action:'email-check',email:approval.email}},res);
+    assert.equal(res.code,status);assert.equal(res.body.next,next);assert.equal(sent,0);assert.equal(res.headers['Set-Cookie'],undefined);assert.equal(db.calls.filter(call=>call.name==='consume_staff_auth_limit').length,3);assert.equal(db.calls.some(call=>call.insert||call.mutation),false);
+  }
+  const db=database();db.rpc=async()=>({data:false});const handler=createStaffLoginHandler({databaseFactory:()=>db,authFactory:()=>({})}),res=response();
+  await handler({method:'POST',headers:{origin:process.env.APP_ORIGIN},body:{action:'email-check',email:approval.email}},res);assert.equal(res.code,429);assert.equal(db.calls.length,0);
 });
 test('password creation requires the mailbox-verified stage, not a supplied email or password login',async()=>{
   await assert.rejects(setStaffPassword({record:{kind:'password'}},response(),'Maple!River-Copper42','Maple!River-Copper42'),{statusCode:401});
