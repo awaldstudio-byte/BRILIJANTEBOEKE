@@ -6,6 +6,7 @@ import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { optionalText, text, uuid } from "./_lib/validation.js";
 import { addAcademicYear, assertPeriodYear } from './_lib/academic-years.js';
+import { schoolOrderLink } from '../assets/school-links.js';
 
 export default async function handler(req, res) {
   if (req.method === "GET") return list(req, res);
@@ -84,6 +85,9 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
     } else {
       schoolResult = await database.from("schools").insert(schoolPayload).select().single();
     }
+    if (schoolResult.error?.code === '23505') {
+      throw Object.assign(new Error('That school link identifier is already in use. Choose a different identifier.'), { statusCode: 409 });
+    }
     assertDatabaseResult(schoolResult.error);
     const school = schoolResult.data;
 
@@ -157,7 +161,7 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
       });
       assertDatabaseResult(newAccessError);
       generatedCode = rawToken;
-      generatedLink = `${env().appOrigin}/order/?school=${encodeURIComponent(rawToken)}&lang=en`;
+      generatedLink = schoolOrderLink(env().appOrigin, school.slug, rawToken);
     }
 
     const { error: auditError } = await database.from("audit_events").insert({

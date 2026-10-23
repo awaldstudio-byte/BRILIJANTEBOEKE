@@ -1,5 +1,6 @@
 import { initStaffAccess } from './staff-access.js';
 import { initAcademicYears, periodForYear } from './academic-years.js';
+import { schoolOrderLink } from './school-links.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -304,6 +305,7 @@ function editSchool(schoolId) {
   $("#school-form-title").textContent = school.name;
   renderOfferingFields(state.catalog.offerings.filter((item) => item.ordering_period_id === period?.id));
   $("#generated-link").hidden = true;
+  renderSchoolEntryLink();
 }
 
 function resetSchoolForm() {
@@ -322,6 +324,23 @@ function resetSchoolForm() {
   $("#school-form-message").textContent = "";
   $("#generated-link").hidden = true;
   if (state.catalog) renderOfferingFields([]);
+  renderSchoolEntryLink();
+}
+
+function renderSchoolEntryLink() {
+  const input = $('#school-form').school_slug;
+  let panel = $('#school-entry-link');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'school-entry-link';
+    panel.className = 'generated-link';
+    input.closest('.field-pair').after(panel);
+  }
+  const school = state.catalog?.schools.find(item => item.id === $('#school-form').school_id.value);
+  panel.hidden = !school;
+  if (!school) return;
+  const url = schoolOrderLink(location.origin, school.slug, '', language);
+  panel.innerHTML = `<strong>${tr('Skool se toegangskakel', 'School entry link')}</strong><p>${tr('Hierdie herbruikbare skakel vra vir die private skoolkode. Die skakelfragment alleen verleen nie toegang nie.', 'This reusable link asks for the private school code. The link identifier alone does not grant access.')}</p><a class="btn btn-outline" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${tr('Maak skoolblad oop', 'Open school page')}</a><p class="quiet-text">${escapeHtml(url)}</p>`;
 }
 
 $('#school-form [name=academic_year_id]').addEventListener('change',()=>{
@@ -362,7 +381,7 @@ $("#school-form").addEventListener("submit", async (event) => {
     message.textContent = tr("Voorskoumodus: geen skooldata is gestoor nie.", "Preview mode: no school data was saved.");
     showGeneratedAccess({
       generated_code: "BRILJ-2027",
-      generated_link: `${location.origin}/order/?school=BRILJ-2027&lang=en`,
+      generated_link: `${schoolOrderLink(location.origin, form.school_slug.value, 'BRILJ-2027', language)}&preview=1`,
     }, form.contact_email.value, form.school_name.value || tr("Nuwe skool", "New school"));
     return;
   }
@@ -486,6 +505,17 @@ function showGeneratedAccess(result, contactEmail, schoolName) {
   $("#generated-link").hidden = false;
   $("[data-generated-code]").value = result.generated_code ?? "";
   $("[data-generated-url]").value = result.generated_link ?? "";
+  let open = $('[data-open-order]');
+  if (!open) {
+    open = document.createElement('a');
+    open.dataset.openOrder = '';
+    open.className = 'btn btn-outline';
+    open.target = '_blank';
+    open.rel = 'noopener noreferrer';
+    $('[data-copy-link]').after(open);
+  }
+  open.href = result.generated_link;
+  open.textContent = tr('Maak bestelblad oop', 'Open ordering page');
   const subject = tr("Briljante Boeke private skoolbestelling", "Briljante Boeke private school ordering");
   const body = tr(
     `Goeiedag\n\nDie private besteltoegang vir ${schoolName} is gereed.\n\nToegangskode: ${result.generated_code}\nBestelskakel: ${result.generated_link}\n\nDeel asseblief hierdie besonderhede slegs met die betrokke ouers.`,

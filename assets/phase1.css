@@ -38,6 +38,9 @@ a { color: #0868b8; }
 .quiet-text { color: var(--muted); font-size: .86rem; }
 .order-shell { width: min(1338px, 88vw); min-height: calc(100vh - 170px); margin: 0 auto; padding: 50px 0 80px; }
 .notice-card { max-width: 760px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); padding: 25px; }
+.payment-unavailable { max-width: none; margin: 24px 0; }
+#school-entry-link p { overflow-wrap: anywhere; margin-bottom: 12px; }
+#school-entry-link p:last-child { margin: 12px 0 0; }
 .notice-error { border-color: #e7c9c6; background: #fff8f7; }
 .notice-error h1 { font-size: 1.8rem; }
 .order-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 40px; align-items: end; }

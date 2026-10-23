@@ -1,6 +1,7 @@
+import { schoolAccess, paymentReadiness } from './school-links.js';
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
-const schoolToken = query.get("school") ?? query.get("code") ?? "";
+const { token: schoolToken, identifier: schoolIdentifier } = schoolAccess(location.search);
 const preview = query.get("preview") === "1";
 const policyVersion = "2026-10-20";
 const locale = language === "en" ? "en-ZA" : "af-ZA";
@@ -68,8 +69,7 @@ async function init() {
     return;
   }
   try {
-    state.config = preview ? previewConfig() : await api(`/api/public-school?token=${encodeURIComponent(schoolToken)}`);
-    if (!preview && !state.config.payments_enabled) throw new Error(tr("Aanlynbestellings is nog nie oop nie. Kontak Briljante Boeke vir hulp.", "Online ordering is not open yet. Contact Briljante Boeke for assistance."));
+    state.config = preview ? previewConfig() : await api(`/api/public-school?token=${encodeURIComponent(schoolToken)}&identifier=${encodeURIComponent(schoolIdentifier)}`);
     if (!state.config.period.open && !preview) throw new Error(tr("Hierdie skool se bestelperiode is nie tans oop nie.", "This school's ordering period is not currently open."));
     if (!state.config.offerings.length) throw new Error(tr("Geen werkboeke is tans vir hierdie skool beskikbaar nie.", "No workbooks are currently available for this school."));
     const first = newLearner(state.config.offerings[0].id);
@@ -95,6 +95,20 @@ function renderBase() {
   $("#period-summary").textContent = tr(`Bestellings sluit ${date.format(new Date(period.closes_at))}`, `Orders close ${date.format(new Date(period.closes_at))}`);
   $("#book-count").textContent = tr(`${offerings.length} ${offerings.length === 1 ? "graad" : "grade"} beskikbaar`, `${offerings.length} ${offerings.length === 1 ? "grade" : "grades"} available`);
   $("#checkout-delivery-note").textContent = `${tr("Skoolaflewering", "School delivery")}: ${period.delivery_note || tr("Boeke word in grootmaat by die skool afgelewer; die skool se bevestigde afleweringsreëlings geld.", "Books are delivered to the school in bulk; the school's confirmed delivery arrangements apply.")}`;
+  if (!paymentReadiness(state.config, preview).enabled) {
+    const notice = document.createElement('p');
+    notice.className = 'notice-card payment-unavailable';
+    notice.setAttribute('role', 'status');
+    notice.textContent = paymentUnavailableMessage();
+    $('.order-intro').after(notice);
+    $('#pay-button').disabled = true;
+    $('#pay-button').textContent = tr('Betaling nog nie beskikbaar nie', 'Payment not yet available');
+    $('#payment-message').textContent = paymentUnavailableMessage();
+  }
+}
+
+function paymentUnavailableMessage() {
+  return tr('U kan die werkboeke besigtig en die bestelstappe toets. Aanlynbetaling is nog nie beskikbaar nie. Geen bestelling of persoonlike besonderhede word gestuur voordat betaling beskikbaar is nie.', 'You can view the workbooks and test the ordering steps. Online payment is not available yet. No order or personal details will be submitted until payment is available.');
 }
 
 function renderBooks() {
@@ -263,6 +277,11 @@ async function startPayment() {
   const message = $("#payment-message");
   if (preview) {
     message.textContent = tr("Voorskoumodus: geen bestelling, persoonlike data of betaling is gestuur nie.", "Preview mode: no order, personal information or payment was sent.");
+    return;
+  }
+  if (!paymentReadiness(state.config).enabled) {
+    button.disabled = true;
+    message.textContent = paymentUnavailableMessage();
     return;
   }
   button.disabled = true;

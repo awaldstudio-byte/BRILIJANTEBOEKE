@@ -3,14 +3,18 @@ import { env, requirePayFast } from "./_lib/env.js";
 import { json, methodNotAllowed, publicError } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 
-export default async function handler(req, res) {
+export default createPublicSchoolHandler();
+export function createPublicSchoolHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
+return async function handler(req, res) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
 
   try {
     const token = typeof req.query.token === "string" ? req.query.token.trim() : "";
     if (token.length < 8 || token.length > 300) return json(res, 404, { error: "This school link or access code is unavailable." });
 
-    const database = serviceClient();
+    const identifier = typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '';
+    if (identifier.length > 120 || (identifier && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(identifier))) return json(res, 404, { error: "This school link or access code is unavailable." });
+    const database = databaseFactory();
     const tokenHash = sha256(token);
     const { data: access, error: accessError } = await database
       .from("school_access")
@@ -18,7 +22,7 @@ export default async function handler(req, res) {
       .eq("token_hash", tokenHash)
       .maybeSingle();
     assertDatabaseResult(accessError);
-    if (!access || access.revoked_at || (access.expires_at && new Date(access.expires_at) <= new Date())) {
+    if (!access || access.revoked_at || (access.expires_at && Date.parse(access.expires_at) <= now())) {
       return json(res, 404, { error: "This school link or access code is unavailable." });
     }
 
@@ -34,12 +38,13 @@ export default async function handler(req, res) {
     assertDatabaseResult(schoolError);
     assertDatabaseResult(periodError);
 
-    const now = Date.now();
+    if (identifier && school?.slug !== identifier) return json(res, 404, { error: "This school link or access code is unavailable." });
+    const currentTime = now();
     const open =
       school?.status === "active" &&
       period?.status === "open" &&
-      Date.parse(period.opens_at) <= now &&
-      Date.parse(period.closes_at) > now;
+      Date.parse(period.opens_at) <= currentTime &&
+      Date.parse(period.closes_at) > currentTime;
     if (!school || !period) return json(res, 404, { error: "This school link or access code is unavailable." });
 
     const { data: offerings, error: offeringsError } = await database
@@ -52,7 +57,7 @@ export default async function handler(req, res) {
     assertDatabaseResult(offeringsError);
 
     let paymentsEnabled = false;
-    try { requirePayFast(env()); paymentsEnabled = true; } catch { /* Ordering stays closed until payment configuration is complete. */ }
+    try { checkPayments(configuration()); paymentsEnabled = true; } catch { /* Browsing is separate from payment readiness. Checkout stays server-gated. */ }
     return json(res, 200, {
       payments_enabled: paymentsEnabled,
       school: { slug: school.slug, name: school.name },
@@ -77,4 +82,5 @@ export default async function handler(req, res) {
     const result = publicError(error);
     return json(res, result.status, { error: result.message });
   }
+}
 }
