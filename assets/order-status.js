@@ -36,8 +36,9 @@ function show(status, order = null) {
   if (status === "paid") {
     icon.textContent = "✓";
     icon.classList.add("paid");
-    title.textContent = tr("Betaling ontvang", "Payment received");
-    copy.textContent = tr("Die betaling is geverifieer en die bestelling is by Briljante se betaalde leerderlys gevoeg.", "The payment has been verified and the order has been added to Briljante's paid learner list.");
+    const demo = order?.reference?.startsWith('DEMO-');
+    title.textContent = demo ? tr('Demobestelling voltooi','Demo order complete') : tr("Betaling ontvang", "Payment received");
+    copy.textContent = demo ? tr('Geen geld is gehef nie. Die bestelling verskyn slegs vir toetsing as betaal.','No money was charged. The order appears as paid for testing only.') : tr("Die betaling is geverifieer en die bestelling is by Briljante se betaalde leerderlys gevoeg.", "The payment has been verified and the order has been added to Briljante's paid learner list.");
   } else if (["payment_failed", "cancelled"].includes(status)) {
     icon.textContent = "!";
     icon.classList.add("failed");

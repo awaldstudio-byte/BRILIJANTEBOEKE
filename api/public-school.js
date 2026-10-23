@@ -2,6 +2,7 @@ import { env, requirePayFast } from './_lib/env.js';
 import { json, methodNotAllowed, publicError } from './_lib/http.js';
 import { assertDatabaseResult, serviceClient } from './_lib/supabase.js';
 import { resolveSchoolOrdering } from './_lib/school-ordering.js';
+import { canDemoPay } from './_lib/demo-payment.js';
 
 export default createPublicSchoolHandler();
 export function createPublicSchoolHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
@@ -23,6 +24,7 @@ export function createPublicSchoolHandler({ databaseFactory = serviceClient, con
       try { checkPayments(configuration()); paymentsEnabled = true; } catch { /* Checkout remains disabled until configured. */ }
       return json(res, 200, {
         payments_enabled: paymentsEnabled,
+        demo_payments_enabled: open && await canDemoPay(req,res,school),
         school: { slug: school.slug, name: school.name },
         period: { id: period.id, name: period.name, academic_year: period.academic_years, opens_at: period.opens_at,
           closes_at: period.closes_at, delivery_note: period.delivery_note, open },

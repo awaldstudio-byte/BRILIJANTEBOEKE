@@ -107,6 +107,10 @@ async function loadData() {
   state.catalog = catalog;
   state.orders = orders.orders;
   state.batches = fulfilment.batches;
+  let demoNotice = $('#demo-data-notice');
+  if (!demoNotice) { demoNotice = document.createElement('p'); demoNotice.id = 'demo-data-notice'; demoNotice.className = 'notice'; $('#admin-app').prepend(demoNotice); }
+  demoNotice.hidden = dashboard.demo_mode !== true;
+  demoNotice.textContent = tr('Toetsomgewing: DEMO-bestellings tel in hierdie voorskou se syfers, maar geen geld is ontvang nie. DEMO-bedrae word uitgesluit van die finansiële oorsig wanneer die toetsmodus afgeskakel word.', 'Testing environment: DEMO orders are included in these preview figures, but no money was received. DEMO amounts are excluded from the financial overview when test mode is disabled.');
   renderOverview();
   renderCatalog();
   renderOrders(state.orders);
@@ -118,7 +122,7 @@ function renderOverview() {
   $("#metric-grid").innerHTML = [
     [tr("Aktiewe skole", "Active schools"), summary.active_schools, tr("Huidige opstellings", "Current configurations"), "", "schools"],
     [tr("Wag vir betaling", "Pending payment"), summary.pending_orders, tr("Nog nie deur PayFast bevestig nie", "Not yet confirmed by PayFast"), "attention", "pending_payment"],
-    [tr("Betaalde bestellings", "Paid orders"), summary.paid_orders, tr("PayFast geverifieer", "Verified by PayFast"), "success", "paid"],
+    [tr("Betaalde bestellings", "Paid orders"), summary.paid_orders, tr("As betaal aangeteken", "Recorded as paid"), "success", "paid"],
     [tr("Betaalde waarde", "Paid value"), money.format(summary.paid_total_cents / 100), tr("Alle betaalde bestellings", "All paid orders"), "", "paid"],
   ].map(([label, value, note, tone, target]) => `<button class="metric-card ${tone}" type="button" data-metric-target="${target}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></button>`).join("");
 

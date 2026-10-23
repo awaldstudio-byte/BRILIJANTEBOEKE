@@ -1,6 +1,7 @@
 import { requireStaff } from "./_lib/auth.js";
 import { json, methodNotAllowed, publicError } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
+import { demoEnvironment } from './_lib/demo-payment.js';
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
@@ -9,11 +10,13 @@ export default async function handler(req, res) {
     if (String(req.query?.session ?? "") === "1") return json(res, 200, { staff });
 
     const database = serviceClient();
+    const demoMode = demoEnvironment();
+    const financialOrders = query => demoMode ? query : query.not('reference','like','DEMO-%');
     const [schools, pending, paid, revenue, recent, periods, offerings, paidItems] = await Promise.all([
       database.from("schools").select("id", { count: "exact", head: true }).eq("status", "active"),
-      database.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment"),
-      database.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid"),
-      database.from("orders").select("amount_cents").eq("status", "paid"),
+      financialOrders(database.from("orders").select("id", { count: "exact", head: true }).eq("status", "pending_payment")),
+      financialOrders(database.from("orders").select("id", { count: "exact", head: true }).eq("status", "paid")),
+      financialOrders(database.from("orders").select("amount_cents").eq("status", "paid")),
       database
         .from("orders")
         .select("reference, amount_cents, status, created_at, paid_at, parent_first_name, parent_last_name, schools(name)")
@@ -42,6 +45,7 @@ export default async function handler(req, res) {
 
     return json(res, 200, {
       staff,
+      demo_mode: demoMode,
       summary: {
         active_schools: schools.count ?? 0,
         pending_orders: pending.count ?? 0,

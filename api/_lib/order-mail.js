@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer';
+import { orderEmailContent } from './order-email-design.js';
 
 const address = /^[A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 export function mailSettings(source = process.env) {
@@ -10,6 +11,7 @@ export function mailSettings(source = process.env) {
     throw Object.assign(new Error('Order email is not configured.'), {code:'MAIL_NOT_CONFIGURED'});
   }
   return {host:source.SMTP_HOST,port,user:source.SMTP_USER,password:source.SMTP_PASSWORD,from,replyTo,
+    appOrigin:source.APP_ORIGIN || 'https://www.briljanteboeke.co.za',
     staff:(source.BRILJANTE_NOTIFICATION_EMAILS || '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean)};
 }
 
@@ -28,22 +30,20 @@ export function paidOrderMessage(job,order,settings) {
   const parent = job.kind === 'parent_order_paid';
   const staff = job.kind === 'staff_order_paid';
   const recipient=job.recipient.toLowerCase();
+  const demo = order.reference.startsWith('DEMO-');
+  if (demo && (settings.demoOnly !== true || order.school_id !== 'edabcd03-1854-43ca-ac93-45c71e9ef012')) {
+    throw Object.assign(new Error('Demo mail requires the dedicated test sender.'), {code:'DEMO_MAIL_DENIED'});
+  }
+  if (settings.demoOnly === true && !demo) throw Object.assign(new Error('Real orders cannot use the demo sender.'),{code:'DEMO_MAIL_DENIED'});
   if ((!parent && !staff) || (parent && recipient!==order.parent_email.toLowerCase()) || (staff && !settings.staff.includes(recipient))) {
     throw Object.assign(new Error('Notification recipient is not authorised.'),{code:'RECIPIENT_NOT_AUTHORISED'});
   }
-  const amount=new Intl.NumberFormat('en-ZA',{style:'currency',currency:'ZAR'}).format(order.amount_cents/100);
-  const school=order.schools?.name || 'School / Skool';
-  const text=[parent?'Payment confirmation / Betalingsbevestiging':'Paid school order / Betaalde skoolbestelling','',
-    `Order / Bestelling: ${order.reference}`,`School / Skool: ${school}`,`Amount paid / Bedrag betaal: ${amount}`,'',
-    parent?'Your payment has been verified. Your workbook order is recorded as paid.':'A school workbook order has been verified as paid. Sign into the staff dashboard to view its details.',
-    parent?'U betaling is geverifieer. U werkboekbestelling is as betaal aangeteken.':'’n Skoolwerkboekbestelling is as betaal geverifieer. Meld by die personeelportaal aan vir besonderhede.','',
-    'Payment confirmation is not a dispatch or delivery notification. Books are delivered in bulk to the school under its confirmed delivery arrangements.',
-    'Betalingsbevestiging is nie ’n versendings- of afleweringskennisgewing nie. Boeke word volgens die skool se bevestigde reëlings in grootmaat by die skool afgelewer.','',
-    `Queries / Navrae: ${settings.replyTo}`,'Briljante Boeke'].join('\n');
   if (!/^[0-9a-f-]{36}$/i.test(job.id)) throw Object.assign(new Error('Invalid job identifier.'),{code:'INVALID_NOTIFICATION'});
   return {from:{name:'Briljante Boeke',address:settings.from},replyTo:settings.replyTo,to:job.recipient,
-    subject:`Briljante Boeke — ${order.reference} — Payment received / Betaling ontvang`,
-    messageId:`<order-${job.id}@briljanteboeke.co.za>`,text,disableFileAccess:true,disableUrlAccess:true};
+    subject:`${demo ? '[DEMO] ' : ''}Briljante Boeke — ${order.reference} — ${parent ? 'Order confirmation / Bestelbevestiging' : 'Payment confirmation / Betalingsbevestiging'}`,
+    messageId:`<order-${job.id}@briljanteboeke.co.za>`,
+    ...orderEmailContent(order,{parent,demo,replyTo:settings.replyTo,appOrigin:settings.appOrigin || 'https://www.briljanteboeke.co.za'}),
+    disableFileAccess:true,disableUrlAccess:true};
 }
 
 // Claims use compare-and-set so concurrent workers cannot send the same queued job.
@@ -63,7 +63,7 @@ export async function drainOrderMail(database,transport,settings,{limit=5,now=ne
     if(!claim.data){summary.skipped++;continue;}
     let accepted=false;
     try {
-      const result=await database.from('orders').select('reference,status,paid_at,amount_cents,parent_email,schools(name)').eq('id',job.order_id).single();
+      const result=await database.from('orders').select('reference,status,paid_at,amount_cents,parent_first_name,parent_last_name,parent_email,parent_mobile,school_id,schools(name),ordering_periods(academic_years(year)),order_items(description_snapshot,quantity,line_total_cents,learners(first_name,last_name))').eq('id',job.order_id).single();
       if(result.error) throw Object.assign(new Error('Order lookup failed.'),{code:'ORDER_LOOKUP_FAILED'});
       const sent=await transport.sendMail(paidOrderMessage(job,result.data,settings));
       accepted=sent.accepted?.some(x=>String(x).toLowerCase()===job.recipient.toLowerCase())===true;

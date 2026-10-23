@@ -103,16 +103,18 @@
               <p class="secure-note" id="checkout-delivery-note"></p>
               <p class="secure-note" data-policy-language="af">Betaling bevestig jou bestelling volgens die bestel-, aflewerings- en terugbetalingsvoorwaardes wat in die vorige stap vertoon en aanvaar is. <a href="/refund_returns/" target="_blank" rel="noopener">Lees die volledige bepalings</a>.</p>
               <p class="secure-note" data-policy-language="en" hidden>Payment confirms your order under the order, delivery and returns conditions displayed and accepted in the previous step. <a href="/refund_returns/" target="_blank" rel="noopener">Read the full terms</a>.</p>
-              <p class="secure-note">Die bestelling word slegs as betaal gemerk nadat PayFast se betalingskennisgewing deur die stelsel geverifieer is.</p>
+              <p class="secure-note" id="payment-verification-note">Die bestelling word slegs as betaal gemerk nadat PayFast se betalingskennisgewing deur die stelsel geverifieer is.</p>
               <div class="button-row"><button class="btn btn-outline" type="button" data-back="2">Terug</button><button id="pay-button" class="btn btn-primary" type="button">Betaal met PayFast</button></div>
               <p id="payment-message" class="form-message" role="status"></p>
             </section>
+            <section id="demo-result" class="step-panel" hidden></section>
           </aside>
         </div>
       </div>
     </main>
 
     <footer class="phase-footer"><span>Briljante Boeke</span><span><a href="/frequently-asked-questions/" target="_blank" rel="noopener">FAQ</a> · <a href="/privacy-policy-2/" target="_blank" rel="noopener">Privaatheidsbeleid</a> · <a href="/refund_returns/" target="_blank" rel="noopener">Bepalings</a></span><span>Veilige betalings deur PayFast</span></footer>
+    <dialog id="demo-payment-dialog" class="demo-payment-dialog" aria-labelledby="demo-dialog-title" aria-describedby="demo-dialog-copy"><p class="phase-label">DEMO / TOETS</p><h2 id="demo-dialog-title"></h2><p id="demo-dialog-copy"></p><div class="button-row"><button class="btn btn-outline" id="demo-cancel" type="button" autofocus>Cancel</button><button class="btn btn-primary" id="demo-confirm" type="button">Confirm demo payment</button></div></dialog>
     <script type="module" src="/assets/order-app.js"></script>
   </body>
 </html>

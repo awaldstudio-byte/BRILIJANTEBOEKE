@@ -4,14 +4,17 @@ import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { validateOrderInput } from "./_lib/validation.js";
 import { resolveSchoolOrdering, internalSchoolOrderHash } from './_lib/school-ordering.js';
+import { createDemoPaymentHandler } from './_lib/demo-payment-handler.js';
 
 export default createOrderHandler();
-export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
+export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), demoHandler = createDemoPaymentHandler() } = {}) {
 return async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
 
   try {
-    const input = validateOrderInput(await readJson(req));
+    const body = await readJson(req);
+    if (body.confirm_demo === true) { req.body = body; return demoHandler(req,res); }
+    const input = validateOrderInput(body);
     const config = checkPayments(configuration());
     const orderToken = deriveOrderToken(input.idempotencyKey, config.orderTokenSecret);
     const database = databaseFactory();
