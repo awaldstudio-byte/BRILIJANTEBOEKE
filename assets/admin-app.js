@@ -1,6 +1,7 @@
 import { initStaffAccess } from './staff-access.js';
 import { initAcademicYears, periodForYear } from './academic-years.js';
 import { schoolOrderLink } from './school-links.js';
+import { initSchoolMaterials } from './school-materials.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -338,6 +339,7 @@ function renderSchoolEntryLink() {
   const url = schoolOrderLink(location.origin, school.slug, language, $('#school-form').period_id.value);
   panel.innerHTML = `<strong>${tr('Skoolbestelskakel', 'School order link')}</strong><p>${tr('Deel hierdie skakel met die skool se ouers. Dit maak die gekose bestelperiode direk oop; geen toegangskode of rekening is nodig nie.', 'Share this link with the school’s parents. It opens the selected ordering period directly; no access code or account is needed.')}</p><div class="share-actions"><a class="btn btn-outline" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${tr('Maak skoolblad oop', 'Open school page')}</a><button type="button" class="btn btn-outline" data-copy-school-entry>${tr('Kopieer skakel', 'Copy link')}</button></div><p class="quiet-text">${escapeHtml(url)}</p>`;
   panel.querySelector('[data-copy-school-entry]').addEventListener('click', event => copyAccess(event.currentTarget, url));
+  initSchoolMaterials({panel,school,periodId:$('#school-form').period_id.value,language,preview,tr,api});
 }
 
 $('#school-form [name=academic_year_id]').addEventListener('change',()=>{

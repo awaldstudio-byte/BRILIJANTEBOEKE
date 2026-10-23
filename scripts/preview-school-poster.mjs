@@ -1,0 +1,11 @@
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { posterPdf, qrPng, materialLink } from '../api/_lib/school-materials.js';
+const output=resolve('../../outputs/school-materials');
+await mkdir(output,{recursive:true});
+const school={id:'11111111-1111-4111-8111-111111111111',name:'Test School 1',slug:'test-school-1'};
+const period={id:'87c7f749-f232-4eb0-b81e-69b10bd83f72',academic_years:{year:2027},closes_at:'2026-12-21T19:08:00Z'};
+const origin='https://briljante-preview-awaldstudio.vercel.app';
+await writeFile(resolve(output,'test-school-1-poster.pdf'),await posterPdf({school,period,origin,gradeNames:['1','2','3','4','5','6','7'],ready:false}));
+await writeFile(resolve(output,'test-school-1-qr.png'),await qrPng(materialLink(origin,school,period,'en')));
+console.log(output);

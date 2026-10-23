@@ -41,6 +41,13 @@ a { color: #0868b8; }
 .payment-unavailable { max-width: none; margin: 24px 0; }
 #school-entry-link p { overflow-wrap: anywhere; margin-bottom: 12px; }
 #school-entry-link p:last-child { margin: 12px 0 0; }
+.school-materials { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 20px; }
+.school-materials h3 { margin-bottom: 8px; }
+.school-materials label { display: grid; gap: 7px; margin: 12px 0; }
+.school-materials input[type=file] { width: 100%; min-width: 0; font-size: .85rem; }
+.school-logo-preview { background: white; border: 1px solid var(--line); padding: 12px; margin-bottom: 12px; }
+.school-logo-preview img { display: block; width: auto; max-width: 160px; height: auto; max-height: 100px; object-fit: contain; }
+.school-materials .share-actions { margin-top: 14px; }
 .notice-error { border-color: #e7c9c6; background: #fff8f7; }
 .notice-error h1 { font-size: 1.8rem; }
 .order-intro { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 40px; align-items: end; }

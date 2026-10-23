@@ -3,7 +3,8 @@
   "trailingSlash": true,
   "functions": {
     "api/admin-login.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
-    "api/payfast-notify.js": { "maxDuration": 120 }
+    "api/payfast-notify.js": { "maxDuration": 120 },
+    "api/admin-school-materials.js": { "maxDuration": 60, "includeFiles": "{assets/images/logo.png,assets/fonts/roboto-print-*.ttf}" }
   },
   "headers": [
     {
