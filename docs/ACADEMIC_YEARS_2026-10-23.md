@@ -21,3 +21,7 @@ Report period options and the school list include the academic year to distingui
 - Actual authenticated hosted creation remains a user acceptance step. Do not take over the user's credentials, live setup or unsaved browser work. Ask them to save work before refreshing the preview.
 
 Release scope: codex/phase1-foundation and the stable branded preview alias only. The existing public marketing site, real payments and mail activation are unchanged. Internal fixtures, tests and documentation remain excluded from public deployment.
+
+## Hosted release verification
+
+Released source 04b6a23 on 23 October 2026, deployment dpl_9sNUfzbLZc6qS24DutKBPb2o1eht (Ready), assigned to https://briljante-preview-awaldstudio.vercel.app. The hosted year module, admin script and stylesheet exactly matched the checked local files; the HTML contains the new year-management form. Unsigned school/dashboard/export requests returned 401. Unsigned year-creation POST returned 401, cross-site creation returned 403, and internal implementation, fixture and acceptance-query paths returned 404. No live year or audit event was created by these access-boundary checks. The user should save unsaved work before refreshing and perform the authenticated add-year acceptance themselves.
