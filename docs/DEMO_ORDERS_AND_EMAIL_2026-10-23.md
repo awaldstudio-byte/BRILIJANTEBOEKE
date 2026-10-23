@@ -42,3 +42,7 @@ Queries paginate explicitly beyond the API's first result page and fail closed r
 The read-only preview is /api/admin-orders?email_preview=ORDER_REFERENCE and requires the existing approved staff session. It renders the same staff template with inline logo and restrictive CSP, without SMTP, order writes or notification-queue writes. The latest deployment is assigned to the stable branded preview alias with the explicit demo switch retained.
 
 User subsequently asked whether a grade-confirmation popup should precede payment. Recommended showing each learner's selected grade for the target academic year with Edit details and Confirm and continue. This extra grade-review popup has not been implemented; the existing demo-payment confirmation remains unchanged.
+
+## Progress bars
+
+User requested the previously discussed bars. Staff HTML now includes an overall school progress bar and a per-grade bar, with visible percentages and numeric expected/paid/outstanding counts. These are nested presentation tables with inline background colours, not JavaScript, external images or native progress widgets. Text alternatives state the percentages too. Fill is clamped to 0-100%; overall progress counts at most each grade's expected allocation, so oversubscribed grades do not visually hide shortages elsewhere. With the current test data, overall progress is 14%, Grades 1 and 5 are 50%, and the remaining grades are 0%. The parent confirmation remains unchanged. 139 automated checks pass. Preview deployment: dpl_EAJTYar7pRz86iXdfjVjez8c9Nor.

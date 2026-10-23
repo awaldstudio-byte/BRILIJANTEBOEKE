@@ -55,3 +55,10 @@ test('a staff notification cannot silently omit progress when the lookup fails',
     {status:'paid',paid_at:clock,reference:'BB-26-ONE',amount_cents:32000,parent_email:'parent@example.test'},
     {staff:['technical@awaldstudio.com']}),/School progress is required/);
 });
+test('email-safe overall and grade bars are labelled, bounded and do not count overpaid grades against another grade',()=>{
+  const school_progress=calculateSchoolProgress(offerings,[{offering_id:'offering-1',quantity:3,line_total_cents:96000}],clock);
+  const content=orderEmailContent({reference:'BB-26-ONE',amount_cents:96000,school_progress},{parent:false,replyTo:'info@briljanteboeke.co.za',appOrigin:'https://example.test'});
+  assert.match(content.text,/Overall progress: 50%/);assert.match(content.html,/Overall progress: 50%/);
+  assert.match(content.html,/100% of expected books paid/);assert.match(content.html,/0% of expected books paid/);
+  assert.doesNotMatch(content.html,/<script|<progress|width="150%"/);assert.match(content.html,/width="50%"/);
+});
