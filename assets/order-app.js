@@ -1,7 +1,7 @@
 import { schoolAccess, paymentReadiness } from './school-links.js';
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
-const { token: schoolToken, identifier: schoolIdentifier } = schoolAccess(location.search);
+const { token: schoolToken, identifier: schoolIdentifier, periodId } = schoolAccess(location.search);
 const preview = query.get("preview") === "1";
 const policyVersion = "2026-10-20";
 const locale = language === "en" ? "en-ZA" : "af-ZA";
@@ -22,13 +22,12 @@ const state = {
 const englishStatic = new Map([
   ["Veilige skoolbestelling", "Secure school order"],
   ["Skoolbesonderhede word gelaai…", "Loading school details…"],
-  ["PRIVAAT SKOOLBESTELLING", "PRIVATE SCHOOL ORDER"],
-  ["Voer die skoolkode in", "Enter the school access code"],
-  ["Gebruik die toegangskode wat deur die skool of Briljante Boeke verskaf is.", "Use the access code supplied by the school or Briljante Boeke."],
-  ["Skoolkode", "School access code"],
+  ["SKOOLBESTELLING", "SCHOOL ORDER"],
+  ["Gebruik u skool se bestelskakel", "Use your school's ordering link"],
+  ["Maak die skakel oop wat deur die skool of Briljante Boeke aan u gestuur is. Geen toegangskode of rekening is nodig nie.", "Open the link sent to you by the school or Briljante Boeke. No access code or account is needed."],
   ["Gaan voort", "Continue"],
   ["Hierdie skoolskakel is nie beskikbaar nie", "This school link is unavailable"],
-  ["Kontroleer asseblief die skakel wat deur die skool verskaf is.", "Check the link or access code supplied by the school."],
+  ["Kontroleer asseblief die skakel wat deur die skool verskaf is.", "Check the ordering link supplied by your school."],
   ["Bestel werkboeke", "Order workbooks"],
   ["Kies die toepaslike werkboek vir elke kind. Meer as een kind van dieselfde skool kan in een betaling ingesluit word.", "Choose the correct workbook for each child. More than one child from the same school can be included in one payment."],
   ["Kinders", "Children"],
@@ -63,13 +62,13 @@ document.querySelectorAll("[data-policy-language]").forEach((section) => { secti
 init();
 
 async function init() {
-  if (!schoolToken && !preview) {
+  if (!schoolToken && !schoolIdentifier && !preview) {
     $("#loading-state").hidden = true;
     $("#access-view").hidden = false;
     return;
   }
   try {
-    state.config = preview ? previewConfig() : await api(`/api/public-school?token=${encodeURIComponent(schoolToken)}&identifier=${encodeURIComponent(schoolIdentifier)}`);
+    state.config = preview ? previewConfig() : await api(`/api/public-school?token=${encodeURIComponent(schoolToken)}&identifier=${encodeURIComponent(schoolIdentifier)}&period=${encodeURIComponent(periodId)}`);
     if (!state.config.period.open && !preview) throw new Error(tr("Hierdie skool se bestelperiode is nie tans oop nie.", "This school's ordering period is not currently open."));
     if (!state.config.offerings.length) throw new Error(tr("Geen werkboeke is tans vir hierdie skool beskikbaar nie.", "No workbooks are currently available for this school."));
     const first = newLearner(state.config.offerings[0].id);
@@ -196,16 +195,6 @@ function activeLearner() {
   return state.learners.find((item) => item.id === state.activeLearnerId) ?? state.learners[0];
 }
 
-$("#access-form").addEventListener("submit", (event) => {
-  event.preventDefault();
-  const data = new FormData(event.currentTarget);
-  const code = String(data.get("access_code") ?? "").trim().toUpperCase().replace(/\s+/g, "");
-  const params = new URLSearchParams(location.search);
-  params.set("school", code);
-  params.set("lang", language);
-  location.href = `/order/?${params}`;
-});
-
 $("#book-grid").addEventListener("click", (event) => {
   const button = event.target.closest("[data-select-offering]");
   if (!button) return;
@@ -289,7 +278,7 @@ async function startPayment() {
   message.textContent = "";
   try {
     if (!state.order) {
-      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ school_token: schoolToken, request_id: state.requestId, parent: state.parent, consent: state.consent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
+      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ school_identifier: state.config.school.slug, ordering_period_id: state.config.period.id, request_id: state.requestId, parent: state.parent, consent: state.consent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
       state.order = result.order;
       sessionStorage.setItem(`briljante_order_token_${state.order.reference}`, state.order.access_token);
     }

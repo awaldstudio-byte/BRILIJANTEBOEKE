@@ -3,7 +3,10 @@ const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}
 
 export function validateOrderInput(body) {
   if (!body || typeof body !== "object") throw badRequest("Order details are required.");
-  const schoolToken = text(body.school_token, 8, 300, "The school link or access code is invalid.");
+  const schoolIdentifier = body.school_identifier == null ? null : text(body.school_identifier, 2, 120, 'The school link is invalid.');
+  if (schoolIdentifier && !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(schoolIdentifier)) throw badRequest('The school link is invalid.');
+  const orderingPeriodId = schoolIdentifier ? uuid(body.ordering_period_id, 'The school ordering period is invalid.') : null;
+  const schoolToken = schoolIdentifier ? null : text(body.school_token, 8, 300, "The school link is invalid.");
   const idempotencyKey = text(body.request_id, 16, 100, "The request identifier is invalid.");
   const parent = body.parent ?? {};
   const firstName = text(parent.first_name, 2, 100, "Enter the parent's first name.");
@@ -27,6 +30,8 @@ export function validateOrderInput(body) {
 
   return {
     schoolToken,
+    schoolIdentifier,
+    orderingPeriodId,
     idempotencyKey,
     parent: { first_name: firstName, last_name: lastName, email, mobile },
     consent: { accepted: true, policy_version: policyVersion },

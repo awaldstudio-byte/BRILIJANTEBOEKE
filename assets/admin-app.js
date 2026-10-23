@@ -37,11 +37,10 @@ const englishStatic = new Map([
   ["Afleweringsnota", "Delivery note"],
   ["Grade, pryse en verwagte hoeveelhede", "Grades, prices and expected quantities"],
   ["Werkboekbesonderhede volg", "Workbook details pending"],
-  ["Genereer ’n nuwe private skoolkode en herroep die huidige kode", "Generate a new private school code and revoke the current code"],
-  ["Stoor skoolopstelling", "Save school setup"], ["Nuwe private skooltoegang", "New private school access"],
-  ["Toegangskode", "Access code"], ["Bestelskakel", "Order link"], ["Kopieer kode", "Copy code"],
+  ["Stoor skoolopstelling", "Save school setup"],
+  ['Skoolbestelskakel','School order link'],['Ouers kan die skakel direk oopmaak. Geen toegangskode of rekening is nodig nie.','Parents can open the link directly. No access code or account is needed.'],
+  ["Bestelskakel", "Order link"],
   ["Kopieer skakel", "Copy link"], ["Berei e-pos voor", "Prepare email"],
-  ["Die volledige kode en skakel word slegs een keer gewys. Genereer ’n nuwe kode indien dit verlore raak.", "The complete code and link are shown only once. Generate a new code if they are lost."],
   ["VERSLAE", "REPORTS"], ["Betaalde kinderlyste", "Paid child lists"],
   ["Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.", "Download a CSV containing paid children, grades, parent details and order references. The list can be filtered by school or ordering period."],
   ["Bestelperiode", "Ordering period"], ["Alle periodes", "All periods"], ["Laai CSV af", "Download CSV"],
@@ -143,10 +142,8 @@ function renderCatalog() {
 
   $("#school-list").innerHTML = state.catalog.schools.map((school) => {
     const period = latestPeriod(school.id);
-    const access = period ? state.catalog.access_links.find((item) => item.ordering_period_id === period.id) : null;
     const year = period && state.catalog.academic_years.find(item => item.id === period.academic_year_id)?.year;
-    const accessNote = access?.code_hint ? ` · ${tr("kode eindig op", "code ending in")} ${access.code_hint}` : "";
-    return `<button type="button" data-edit-school="${school.id}"><strong>${escapeHtml(school.name)}</strong><span>${escapeHtml(period ? `${year ? `${year} · ` : ''}${localPeriod(period.name)} · ${localStatus(period.status)}${accessNote}` : tr("Geen bestelperiode", "No ordering period"))}</span></button>`;
+    return `<button type="button" data-edit-school="${school.id}"><strong>${escapeHtml(school.name)}</strong><span>${escapeHtml(period ? `${year ? `${year} · ` : ''}${localPeriod(period.name)} · ${localStatus(period.status)}` : tr("Geen bestelperiode", "No ordering period"))}</span></button>`;
   }).join("") || `<p class='quiet-text'>${tr("Geen skole is nog opgestel nie.", "No schools have been configured yet.")}</p>`;
 
   academicYears.render();
@@ -285,9 +282,9 @@ $("#batch-list").addEventListener("change", async (event) => {
   }
 });
 
-function editSchool(schoolId) {
+function editSchool(schoolId, periodId) {
   const school = state.catalog.schools.find((item) => item.id === schoolId);
-  const period = latestPeriod(schoolId);
+  const period = periodId ? state.catalog.periods.find(item => item.id === periodId && item.school_id === schoolId) : latestPeriod(schoolId);
   const form = $("#school-form");
   form.school_id.value = school.id;
   form.period_id.value = period?.id ?? "";
@@ -301,7 +298,6 @@ function editSchool(schoolId) {
   form.closes_at.value = localDateTime(period?.closes_at);
   form.period_status.value = period?.status ?? "draft";
   form.delivery_note.value = period?.delivery_note ?? "";
-  form.replace_link.checked = false;
   $("#school-form-title").textContent = school.name;
   renderOfferingFields(state.catalog.offerings.filter((item) => item.ordering_period_id === period?.id));
   $("#generated-link").hidden = true;
@@ -337,10 +333,11 @@ function renderSchoolEntryLink() {
     input.closest('.field-pair').after(panel);
   }
   const school = state.catalog?.schools.find(item => item.id === $('#school-form').school_id.value);
-  panel.hidden = !school;
-  if (!school) return;
-  const url = schoolOrderLink(location.origin, school.slug, '', language);
-  panel.innerHTML = `<strong>${tr('Skool se toegangskakel', 'School entry link')}</strong><p>${tr('Hierdie herbruikbare skakel vra vir die private skoolkode. Die skakelfragment alleen verleen nie toegang nie.', 'This reusable link asks for the private school code. The link identifier alone does not grant access.')}</p><a class="btn btn-outline" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${tr('Maak skoolblad oop', 'Open school page')}</a><p class="quiet-text">${escapeHtml(url)}</p>`;
+  panel.hidden = !school || !$('#school-form').period_id.value;
+  if (panel.hidden) return;
+  const url = schoolOrderLink(location.origin, school.slug, language, $('#school-form').period_id.value);
+  panel.innerHTML = `<strong>${tr('Skoolbestelskakel', 'School order link')}</strong><p>${tr('Deel hierdie skakel met die skool se ouers. Dit maak die gekose bestelperiode direk oop; geen toegangskode of rekening is nodig nie.', 'Share this link with the school’s parents. It opens the selected ordering period directly; no access code or account is needed.')}</p><div class="share-actions"><a class="btn btn-outline" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${tr('Maak skoolblad oop', 'Open school page')}</a><button type="button" class="btn btn-outline" data-copy-school-entry>${tr('Kopieer skakel', 'Copy link')}</button></div><p class="quiet-text">${escapeHtml(url)}</p>`;
+  panel.querySelector('[data-copy-school-entry]').addEventListener('click', event => copyAccess(event.currentTarget, url));
 }
 
 $('#school-form [name=academic_year_id]').addEventListener('change',()=>{
@@ -353,9 +350,9 @@ $('#school-form [name=academic_year_id]').addEventListener('change',()=>{
   form.closes_at.value=localDateTime(period?.closes_at);
   form.period_status.value=period?.status||'draft';
   form.delivery_note.value=period?.delivery_note||'';
-  form.replace_link.checked=false;
   renderOfferingFields(state.catalog.offerings.filter(item=>item.ordering_period_id===period?.id));
   $('#generated-link').hidden=true;
+  renderSchoolEntryLink();
   const year=state.catalog.academic_years.find(item=>item.id===form.academic_year_id.value)?.year;
   $('#school-form-message').textContent=period
     ?tr(`Bestelperiode vir ${year} gelaai.`,`Ordering period for ${year} loaded.`)
@@ -380,8 +377,7 @@ $("#school-form").addEventListener("submit", async (event) => {
   if (preview) {
     message.textContent = tr("Voorskoumodus: geen skooldata is gestoor nie.", "Preview mode: no school data was saved.");
     showGeneratedAccess({
-      generated_code: "BRILJ-2027",
-      generated_link: `${schoolOrderLink(location.origin, form.school_slug.value, 'BRILJ-2027', language)}&preview=1`,
+      generated_link: `${schoolOrderLink(location.origin, form.school_slug.value, language)}&preview=1`,
     }, form.contact_email.value, form.school_name.value || tr("Nuwe skool", "New school"));
     return;
   }
@@ -390,7 +386,6 @@ $("#school-form").addEventListener("submit", async (event) => {
     school: { id: values.school_id || null, name: values.school_name, slug: values.school_slug, status: "active", contact_name: values.contact_name, contact_email: values.contact_email, notes: "" },
     period: { id: values.period_id || null, academic_year_id: values.academic_year_id, name: values.period_name, opens_at: new Date(values.opens_at).toISOString(), closes_at: new Date(values.closes_at).toISOString(), status: values.period_status, class_required: false, delivery_note: values.delivery_note },
     offerings,
-    replace_link: form.replace_link.checked,
   };
   const submit = form.querySelector("button[type=submit]");
   submit.disabled = true;
@@ -400,7 +395,7 @@ $("#school-form").addEventListener("submit", async (event) => {
     message.textContent = tr("Skoolopstelling is gestoor.", "School setup was saved.");
     state.catalog = await api("/api/admin-schools");
     renderCatalog();
-    editSchool(result.school.id);
+    editSchool(result.school.id, result.period.id);
     if (result.generated_link) showGeneratedAccess(result, values.contact_email, values.school_name);
   } catch (error) {
     message.textContent = error.message;
@@ -409,7 +404,6 @@ $("#school-form").addEventListener("submit", async (event) => {
   }
 });
 
-$("[data-copy-code]").addEventListener("click", async (event) => copyAccess(event.currentTarget, $("[data-generated-code]").value));
 $("[data-copy-link]").addEventListener("click", async (event) => copyAccess(event.currentTarget, $("[data-generated-url]").value));
 
 $("#report-school").addEventListener("change", updateReportLink);
@@ -503,7 +497,6 @@ function previewCsvCell(value) {
 
 function showGeneratedAccess(result, contactEmail, schoolName) {
   $("#generated-link").hidden = false;
-  $("[data-generated-code]").value = result.generated_code ?? "";
   $("[data-generated-url]").value = result.generated_link ?? "";
   let open = $('[data-open-order]');
   if (!open) {
@@ -516,10 +509,10 @@ function showGeneratedAccess(result, contactEmail, schoolName) {
   }
   open.href = result.generated_link;
   open.textContent = tr('Maak bestelblad oop', 'Open ordering page');
-  const subject = tr("Briljante Boeke private skoolbestelling", "Briljante Boeke private school ordering");
+  const subject = tr("Briljante Boeke skoolbestelling", "Briljante Boeke school ordering");
   const body = tr(
-    `Goeiedag\n\nDie private besteltoegang vir ${schoolName} is gereed.\n\nToegangskode: ${result.generated_code}\nBestelskakel: ${result.generated_link}\n\nDeel asseblief hierdie besonderhede slegs met die betrokke ouers.`,
-    `Good day\n\nThe private ordering access for ${schoolName} is ready.\n\nAccess code: ${result.generated_code}\nOrder link: ${result.generated_link}\n\nPlease share these details only with the relevant parents.`,
+    `Goeiedag\n\nDie bestelskakel vir ${schoolName} is gereed.\n\nBestelskakel: ${result.generated_link}\n\nGeen toegangskode of rekening is nodig nie. Deel asseblief die skakel met die betrokke ouers.`,
+    `Good day\n\nThe ordering link for ${schoolName} is ready.\n\nOrder link: ${result.generated_link}\n\nNo access code or account is needed. Please share the link with the relevant parents.`,
   );
   $("[data-email-access]").href = `mailto:${encodeURIComponent(contactEmail || "")}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 }

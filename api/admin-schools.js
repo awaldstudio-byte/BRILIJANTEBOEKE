@@ -132,8 +132,6 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
     );
     assertDatabaseResult(offeringError);
 
-    let generatedLink = null;
-    let generatedCode = null;
     const { data: currentAccess, error: accessError } = await database
       .from("school_access")
       .select("id")
@@ -160,9 +158,14 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
         expires_at: period.closes_at,
       });
       assertDatabaseResult(newAccessError);
-      generatedCode = rawToken;
-      generatedLink = schoolOrderLink(env().appOrigin, school.slug, rawToken);
     }
+    // Keep the internal RPC record aligned with the ordering deadline. Parents
+    // use the identifier link, not these legacy/internal access credentials.
+    const { error: expiryError } = await database.from('school_access')
+      .update({ expires_at: period.closes_at }).eq('school_id', school.id)
+      .eq('ordering_period_id', period.id).is('revoked_at', null);
+    assertDatabaseResult(expiryError);
+    const generatedLink = schoolOrderLink(env().appOrigin, school.slug, 'en', period.id);
 
     const { error: auditError } = await database.from("audit_events").insert({
       actor_user_id: user.id,
@@ -177,7 +180,7 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
       school,
       period,
       generated_link: generatedLink,
-      generated_code: generatedCode,
+      generated_code: null,
     });
   } catch (error) {
     if (error.statusCode !== 401) console.error("admin-schools-save", { code: error.code, message: error.message });

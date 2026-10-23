@@ -1,5 +1,7 @@
 # School ordering access
 
+Superseded later on 23 October 2026 by the user's decision to remove parent access codes. See SCHOOL_DIRECT_LINKS_2026-10-23.md for the current flow.
+
 ## Changes
 
 Open school periods now show their workbook catalogue and allow in-browser completion of the order steps when PayFast is unconfigured. A bilingual notice explains the restriction. The payment button and direct client payment handler remain disabled; the existing server payment-configuration gate still rejects order creation before any database write. This does not activate payments, order confirmations or real order capture.

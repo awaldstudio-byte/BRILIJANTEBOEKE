@@ -3,17 +3,25 @@ import { env, requirePayFast } from "./_lib/env.js";
 import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { validateOrderInput } from "./_lib/validation.js";
+import { resolveSchoolOrdering, internalSchoolOrderHash } from './_lib/school-ordering.js';
 
-export default async function handler(req, res) {
+export default createOrderHandler();
+export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
+return async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
 
   try {
     const input = validateOrderInput(await readJson(req));
-    const config = requirePayFast(env());
+    const config = checkPayments(configuration());
     const orderToken = deriveOrderToken(input.idempotencyKey, config.orderTokenSecret);
-    const database = serviceClient();
+    const database = databaseFactory();
+    let tokenHash = input.schoolToken ? sha256(input.schoolToken) : null;
+    if (input.schoolIdentifier) {
+      const { school, period } = await resolveSchoolOrdering(database, { identifier: input.schoolIdentifier, periodId: input.orderingPeriodId }, now());
+      tokenHash = await internalSchoolOrderHash(database, school, period, now());
+    }
     const { data, error } = await database.rpc("create_school_order", {
-      p_token_hash: sha256(input.schoolToken),
+      p_token_hash: tokenHash,
       p_idempotency_key: input.idempotencyKey,
       p_order_access_hash: sha256(orderToken),
       p_parent: { ...input.parent, consent: input.consent },
@@ -43,4 +51,5 @@ export default async function handler(req, res) {
     const result = publicError(error);
     return json(res, result.status, { error: result.message });
   }
+};
 }

@@ -5,25 +5,26 @@ import vm from 'node:vm';
 import { schoolAccess, schoolOrderLink, paymentReadiness } from '../assets/school-links.js';
 import { createPublicSchoolHandler } from '../api/public-school.js';
 import { sha256 } from '../api/_lib/crypto.js';
-import orders from '../api/orders.js';
+import orders, { createOrderHandler } from '../api/orders.js';
+import { resolveSchoolOrdering } from '../api/_lib/school-ordering.js';
 import { createSchoolSaveHandler } from '../api/admin-schools.js';
 
 const token = 'ABCDE-23456';
 const clock = Date.parse('2026-10-23T08:00:00Z');
-const school = { id: 's', slug: 'test-school-1', name: 'Test School 1', status: 'active' };
-const period = { id: 'p', status: 'open', opens_at: '2026-10-01T00:00:00Z', closes_at: '2026-12-01T00:00:00Z' };
+const school = { id: '11111111-1111-4111-8111-111111111111', slug: 'test-school-1', name: 'Test School 1', status: 'active' };
+const period = { id: '22222222-2222-4222-8222-222222222222', status: 'open', opens_at: '2026-10-01T00:00:00Z', closes_at: '2026-12-01T00:00:00Z' };
 function fixture({ schoolOverride = {}, periodOverride = {}, accessOverride = {}, missingAccess = false } = {}) {
   const tables = {
-    school_access: missingAccess ? [] : [{ school_id: 's', ordering_period_id: 'p', token_hash: sha256(token), expires_at: period.closes_at, revoked_at: null, ...accessOverride }],
+    school_access: missingAccess ? [] : [{ school_id: school.id, ordering_period_id: period.id, token_hash: sha256(token), expires_at: period.closes_at, revoked_at: null, ...accessOverride }],
     schools: [{ ...school, ...schoolOverride }],
-    ordering_periods: [{ ...period, school_id: 's', ...periodOverride }],
-    school_grade_offerings: [{ id: 'o', school_id: 's', ordering_period_id: 'p', active: true, price_cents: 32000, grades: { code: '1' }, books: { title: 'Grade 1 Workbook' } }],
+    ordering_periods: [{ ...period, school_id: school.id, ...periodOverride }],
+    school_grade_offerings: [{ id: 'o', school_id: school.id, ordering_period_id: period.id, active: true, price_cents: 32000, grades: { code: '1' }, books: { title: 'Grade 1 Workbook' } }],
   };
   const reads = [];
-  return { reads, from(table) {
+  return { reads, tables, from(table) {
     reads.push(table); const filters = [];
     const run = () => ({ data: tables[table].filter(row => filters.every(([key, value]) => row[key] === value)), error: null });
-    const query = { select() { return query; }, eq(key, value) { filters.push([key, value]); return query; }, order() { return query; },
+    const query = { select() { return query; }, eq(key, value) { filters.push([key, value]); return query; }, is(key,value) { return query.eq(key,value); }, order() { return query; },
       async maybeSingle() { const result = run(); return { ...result, data: result.data[0] ?? null }; },
       then(resolve, reject) { return Promise.resolve(run()).then(resolve, reject); } };
     return query;
@@ -37,11 +38,12 @@ async function lookup(options = {}, query = { token, identifier: school.slug }, 
   return { res, db };
 }
 
-test('identifiers are included in links without replacing their private code', () => {
-  const link = schoolOrderLink('https://example.test/', school.slug, token);
-  assert.deepEqual(schoolAccess(new URL(link).search), { identifier: school.slug, token });
+test('school links contain only their identifier, optional period and language, never access codes', () => {
+  const link = schoolOrderLink('https://example.test/', school.slug, 'en', period.id);
+  assert.deepEqual(schoolAccess(new URL(link).search), { identifier: school.slug, token: '', periodId: period.id });
   assert.equal(new URL(link).searchParams.get('lang'), 'en');
-  assert.deepEqual(schoolAccess(new URL(schoolOrderLink('https://example.test', school.slug, '', 'af')).search), { identifier: school.slug, token: '' });
+  assert.deepEqual(schoolAccess(new URL(schoolOrderLink('https://example.test', school.slug, 'af')).search), { identifier: school.slug, token: '', periodId: '' });
+  assert.equal(new URL(link).searchParams.has('code'),false); assert.equal(new URL(link).searchParams.has('school'),false);
 });
 test('existing token links and manually entered codes retain compatibility', () => {
   assert.equal(schoolAccess(`?school=${token}&lang=en`).token, token);
@@ -67,13 +69,53 @@ test('a wrong school identifier cannot use another school code', async () => {
   const { res, db } = await lookup({}, { token, identifier: 'another-school' });
   assert.equal(res.code, 404); assert.equal(res.body.school, undefined); assert.ok(!db.reads.includes('school_grade_offerings'));
 });
-test('identifier-only, malformed, invalid, revoked and expired access is denied', async () => {
-  for (const [options, query] of [[{}, { identifier: school.slug }], [{}, { token, identifier: '../school' }],
+test('malformed, invalid, revoked and expired legacy access is denied', async () => {
+  for (const [options, query] of [[{}, {}], [{}, { token, identifier: '../school' }],
     [{}, { token: 'WRONG-23456' }], [{ missingAccess: true }, { token }],
     [{ accessOverride: { revoked_at: '2026-10-22' } }, { token }],
     [{ accessOverride: { expires_at: '2026-10-22T00:00:00Z' } }, { token }]]) {
     const { res } = await lookup(options, query); assert.equal(res.code, 404); assert.equal(res.body.school, undefined);
   }
+});
+
+test('identifier-only catalogue access needs no code and discloses no private records or internal hash', async () => {
+  const {res,db}=await lookup({}, {identifier:school.slug});
+  assert.equal(res.code,200); assert.equal(res.body.period.open,true); assert.equal(res.body.period.id,period.id);
+  assert.deepEqual(db.reads,['schools','ordering_periods','school_grade_offerings']);
+  assert.doesNotMatch(JSON.stringify(res.body),/token_hash|parent|learners|expected_quantity|contact_email/);
+});
+test('unknown schools, inactive schools and a period from another school fail closed',async()=>{
+  for(const [options,query] of [[{},{identifier:'unknown-school'}],
+    [{schoolOverride:{status:'inactive'}},{identifier:school.slug}],
+    [{periodOverride:{school_id:'other-school'}},{identifier:school.slug,period:period.id}]]) {
+    const {res}=await lookup(options,query); assert.equal(res.code,404); assert.equal(res.body.school,undefined);
+  }
+});
+test('generic school link prefers an open period; a year-specific link never jumps to another year',async()=>{
+  const db=fixture();
+  const future={...db.tables.ordering_periods[0],id:'33333333-3333-4333-8333-333333333333',opens_at:'2027-01-01',closes_at:'2027-12-01'};
+  db.tables.ordering_periods.unshift(future);
+  assert.equal((await resolveSchoolOrdering(db,{identifier:school.slug},clock)).period.id,period.id);
+  const pinned=await resolveSchoolOrdering(db,{identifier:school.slug,periodId:future.id},clock);
+  assert.equal(pinned.period.id,future.id); assert.equal(pinned.open,false);
+});
+test('direct school order resolves the correct internal RPC hash and ignores injected prices/hashes',async()=>{
+  const db=fixture(); let rpcCount=0,params;
+  db.rpc=async(name,body)=>{rpcCount++; assert.equal(name,'create_school_order');params=body;
+    return {data:{reused:false,reference:'BB-TEST',amount_cents:32000,status:'pending_payment'}};};
+  const handler=createOrderHandler({databaseFactory:()=>db,configuration:()=>({orderTokenSecret:'test-only-secret'}),checkPayments:config=>config,now:()=>clock});
+  const input={school_identifier:school.slug,ordering_period_id:period.id,token_hash:'injected',amount_cents:1,
+    request_id:'550e8400-e29b-41d4-a716-446655440000',parent:{first_name:'Test',last_name:'Parent',email:'test@example.test',mobile:'0820000000'},
+    consent:{accepted:true,policy_version:'2026-10-20'},learners:[{first_name:'Test',last_name:'Child',offering_id:'2de1d6a7-02b5-41e0-b9ee-b276c4d65041'}]};
+  const res=response();await handler({method:'POST',body:input},res);
+  assert.equal(res.code,201);assert.equal(rpcCount,1);assert.equal(params.p_token_hash,sha256(token));
+  assert.equal(params.amount_cents,undefined);assert.equal(res.body.order.amount_cents,32000);
+  assert.equal(JSON.stringify(res.body).includes(sha256(token)),false);
+  for(const change of [{ordering_period_id:'33333333-3333-4333-8333-333333333333'},{school_identifier:'other-school'}]){
+    const denied=response();await handler({method:'POST',body:{...input,...change}},denied);assert.equal(denied.code,404);assert.equal(rpcCount,1);
+  }
+  db.tables.ordering_periods[0].status='closed';
+  const closed=response();await handler({method:'POST',body:input},closed);assert.equal(closed.code,400);assert.equal(rpcCount,1);
 });
 test('legacy links are not required to supply an identifier', async () => {
   assert.equal((await lookup({}, { token })).res.code, 200);
