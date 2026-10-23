@@ -99,7 +99,7 @@
         </section>
 
         <section id="view-fulfilment" class="admin-view" hidden>
-          <div class="admin-title"><div><p class="phase-label">AFLEWERING</p><h1>Skoolbestellings</h1></div></div>
+          <div class="admin-title"><div><p class="phase-label">AFLEWERING</p><h1>Skoolbestellings</h1></div><button class="btn btn-outline" type="button" id="refresh-shipping">Verfris kennisgewings</button></div>
           <article class="data-card fulfilment-intro"><p>Skep ’n afleweringsbatch vir een skool op ’n slag. Slegs betaalde boeke wat nog nie in ’n batch is nie, word ingesluit. Latere betalings bly beskikbaar vir die volgende batch.</p></article>
           <div class="school-admin-grid"><article class="data-card"><h2>Skep batch</h2><form id="batch-form" class="form-stack"><label>Skool<select name="school_id" required></select></label><label>Bestelperiode<select name="period_id" required></select></label><label>Batchnaam<input name="label" required maxlength="160" placeholder="bv. Oktober 2026" /></label><button class="btn btn-primary" type="submit">Skep afleweringsbatch</button><p id="batch-message" class="form-message" role="status"></p></form></article><article class="data-card"><h2>Bestaande batches</h2><div id="batch-list" class="list-stack"></div></article></div>
         </section>

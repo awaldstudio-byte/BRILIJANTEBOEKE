@@ -233,6 +233,8 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 @media(max-width:640px){.admin-title:has(.report-actions){flex-direction:column;gap:16px}.report-actions .btn{min-width:110px}}
 .fulfilment-intro { max-width: 900px; margin-bottom: 16px; }
 .batch-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
+.shipping-summary { margin:10px 0 0;font-size:.82rem;color:var(--navy); }
+.shipping-previews { display:flex;flex-wrap:wrap;gap:8px 18px;margin-top:12px;font-size:.8rem; }
 
 @media (max-width: 1120px) {
   .order-grid { grid-template-columns: minmax(0, 1fr) 370px; }

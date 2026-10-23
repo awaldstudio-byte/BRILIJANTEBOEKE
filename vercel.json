@@ -6,6 +6,7 @@
     "api/payfast-notify.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
     "api/orders.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
     "api/admin-orders.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
+    "api/admin-fulfilment.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
     "api/admin-school-materials.js": { "maxDuration": 60, "includeFiles": "{assets/images/logo.png,assets/fonts/roboto-print-*.ttf}" },
     "api/admin-export.js": { "maxDuration": 60, "includeFiles": "{assets/images/logo.png,assets/fonts/roboto-print-*.ttf,assets/reports/report-base.xlsx}" }
   },

@@ -3,6 +3,7 @@ import { initAcademicYears, periodForYear } from './academic-years.js';
 import { schoolOrderLink } from './school-links.js';
 import { initSchoolMaterials } from './school-materials.js';
 import { initReportDownloads } from './report-downloads.js';
+import { allowedBatchStatuses, shippingUpdateSummary } from './shipping-status.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -11,6 +12,7 @@ const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR"
 const shortDate = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 const $ = (selector) => document.querySelector(selector);
 const state = { dashboard: null, progress: [], catalog: null, orders: [], batches: [] };
+let shippingRefreshTimer,shippingRefreshCount=0;
 initReportDownloads({language});
 
 const englishStatic = new Map([
@@ -50,6 +52,7 @@ const englishStatic = new Map([
   ['Laai ’n netjiese Excel- of PDF-leerderlys af. Skoollyste bevat Briljante en die skool se opgelaaide logo. Die gesamentlike Excel-verslag bevat ook ’n aparte interne transaksieblad.','Download a formatted Excel or PDF learner register. School reports include Briljante’s logo and the school’s uploaded logo. The combined Excel report also includes a separate internal transactions sheet.'],
   ['Excel behou logo’s, kolomwydtes en filters. PDF is gereed om te druk of met die skool te deel. CSV bevat slegs rou data, sonder uitleg.','Excel retains logos, column widths and filters. PDF is ready to print or share with the school. CSV contains raw data only, without formatting.'],['CSV (rou data)','CSV (raw data)'],
   ["AFLEWERING", "FULFILMENT"], ["Skoolbestellings", "School orders"],
+  ['Verfris kennisgewings','Refresh delivery updates'],
   ["Skep ’n afleweringsbatch vir een skool op ’n slag. Slegs betaalde boeke wat nog nie in ’n batch is nie, word ingesluit. Latere betalings bly beskikbaar vir die volgende batch.", "Create a fulfilment batch for one school at a time. Only paid books not already in a batch are included. Later payments remain available for the next batch."],
   ["Skep batch", "Create batch"], ["Batchnaam", "Batch name"], ["Skep afleweringsbatch", "Create fulfilment batch"], ["Bestaande batches", "Existing batches"],
 ]);
@@ -188,9 +191,21 @@ function renderFulfilment() {
     const batchReport = preview
       ? `<a class="btn btn-outline" href="${escapeAttribute(previewCsvDownloadUrl(previewBatchRows(batch)))}" download="${previewCsvFilename("briljante-school-batch")}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`
       : ['xlsx','pdf','csv'].map(format=>`<a data-report-download class="${format==='csv'?'report-raw':'btn btn-outline'}" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}&format=${format}&lang=${language}">${format==='xlsx'?'Excel (.xlsx)':format==='pdf'?'PDF':tr('CSV (rou data)','CSV (raw data)')}</a>`).join('');
-    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions">${batchReport}<select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
+    const notifications=['dispatched','delivered'].map(event=>{const summary=shippingUpdateSummary(batch.notifications,event);if(!Object.values(summary).some(Boolean))return '';return `<p class="shipping-summary">${escapeHtml(tr(event==='dispatched'?'Versendingskennisgewings':'Afleweringskennisgewings',event==='dispatched'?'Dispatch emails':'School delivery emails'))}: ${summary.sent} ${tr('gestuur','sent')} · ${summary.queued} ${tr('hangende','pending')} · ${summary.processing} ${tr('word gestuur','sending')}${summary.review?` · ${summary.review} ${tr('moet nagegaan word','require review')}`:''}</p>`;}).join('');
+    const pending=(batch.notifications||[]).some(row=>row.status==='queued'&&Number(row.count)>0),canManage=state.staff?.role==='administrator'&&!preview;
+    const previews=preview?'':`<div class="shipping-previews"><a href="/api/admin-fulfilment?email_preview=${encodeURIComponent(batch.id)}&event=dispatched" target="_blank" rel="noopener">${tr('Besigtig versendingse-pos','Preview dispatch email')}</a><a href="/api/admin-fulfilment?email_preview=${encodeURIComponent(batch.id)}&event=delivered" target="_blank" rel="noopener">${tr('Besigtig afleweringse-pos','Preview school delivery email')}</a></div>`;
+    return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions">${batchReport}<select data-batch-status="${batch.id}" ${canManage?'':'disabled'} aria-label="${tr("Batchstatus", "Batch status")}">${allowedBatchStatuses(batch.status).map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select>${pending&&canManage?`<button class="btn btn-outline" type="button" data-send-shipping="${batch.id}">${tr('Stuur hangende kennisgewings','Send pending updates')}</button>`:''}</div>${notifications}${previews}</article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
+  scheduleShippingRefresh();
 }
+function scheduleShippingRefresh(){
+  clearTimeout(shippingRefreshTimer);
+  if(!preview&&shippingRefreshCount<40&&state.batches.some(batch=>(batch.notifications||[]).some(row=>['queued','processing'].includes(row.status)&&Number(row.count)>0)))shippingRefreshTimer=setTimeout(async()=>{
+    if(document.activeElement?.closest('#batch-list')){scheduleShippingRefresh();return;}
+    try{state.batches=(await api('/api/admin-fulfilment')).batches;shippingRefreshCount++;renderFulfilment();}catch{clearTimeout(shippingRefreshTimer);}
+  },2500);
+}
+$('#refresh-shipping').addEventListener('click',async event=>{if(preview)return;event.currentTarget.disabled=true;try{state.batches=(await api('/api/admin-fulfilment')).batches;shippingRefreshCount=0;renderFulfilment();}catch(error){alert(error.message);}finally{event.currentTarget.disabled=false;}});
 
 function renderBatchPeriods() {
   const schoolId = $("#batch-form [name=school_id]").value;
@@ -275,16 +290,21 @@ $("#batch-list").addEventListener("change", async (event) => {
   const select = event.target.closest("[data-batch-status]");
   if (!select || preview) return;
   const previous = state.batches.find((batch) => batch.id === select.dataset.batchStatus)?.status;
-  if (!confirm(tr("Werk die batchstatus op?", "Update the batch status?"))) { select.value = previous; return; }
+  const notify=['dispatched','delivered'].includes(select.value);
+  const confirmation=select.value==='dispatched'?tr('Bevestig dat hierdie batch versend is. Een e-pos per ouer in hierdie batch sal gereël word. DEMO-batchkennisgewings gaan slegs na technical@awaldstudio.com.','Confirm this batch has been dispatched. One email per parent in this batch will be queued. DEMO batch notifications go only to technical@awaldstudio.com.'):select.value==='delivered'?tr('Bevestig dat die skool hierdie batch ontvang het. Ouers sal van aflewering by die skool ingelig word; dit bevestig nie afhaling nie. DEMO-kennisgewings gaan slegs na technical@awaldstudio.com.','Confirm the school has received this batch. Parents will be notified of delivery to the school, not collection. DEMO notifications go only to technical@awaldstudio.com.'):tr('Werk die batchstatus op?','Update the batch status?');
+  if (!confirm(confirmation)) { select.value = previous; return; }
+  select.disabled=true;
   try {
-    await api("/api/admin-fulfilment", { method: "PATCH", body: JSON.stringify({ id: select.dataset.batchStatus, status: select.value }) });
+    await api("/api/admin-fulfilment", { method: "PATCH", body: JSON.stringify({ id: select.dataset.batchStatus, status: select.value,confirm_notifications:notify }) });
+    shippingRefreshCount=0;
     state.batches = (await api("/api/admin-fulfilment")).batches;
     renderFulfilment();
   } catch (error) {
     alert(error.message);
     select.value = previous;
-  }
+  }finally{select.disabled=false;}
 });
+$('#batch-list').addEventListener('click',async event=>{const button=event.target.closest('[data-send-shipping]');if(!button||preview)return;button.disabled=true;try{await api('/api/admin-fulfilment',{method:'POST',body:JSON.stringify({action:'send-pending',id:button.dataset.sendShipping})});shippingRefreshCount=0;state.batches=(await api('/api/admin-fulfilment')).batches;renderFulfilment();}catch(error){alert(error.message);button.disabled=false;}});
 
 function editSchool(schoolId, periodId) {
   const school = state.catalog.schools.find((item) => item.id === schoolId);
