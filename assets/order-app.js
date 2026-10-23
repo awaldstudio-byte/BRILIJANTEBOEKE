@@ -1,4 +1,5 @@
 import { schoolAccess, paymentReadiness } from './school-links.js';
+import { parentOrderResult } from './parent-order-result.js';
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const { token: schoolToken, identifier: schoolIdentifier, periodId } = schoolAccess(location.search);
@@ -98,7 +99,7 @@ function renderBase() {
     const notice = document.createElement('p');
     notice.className = 'notice-card payment-unavailable';
     notice.setAttribute('role', 'status');
-    notice.textContent = tr('DEMO: gebruik slegs toetsbesonderhede. Geen geld word gehef nie. Die ouer-e-pos gaan na die adres wat u invul; die personeelkennisgewing gaan na technical@awaldstudio.com.', 'DEMO: use test details only. No money is charged. The parent email goes to the address you enter; the staff notification goes to technical@awaldstudio.com.');
+    notice.textContent = tr('DEMO: geen geld word gehef nie. U bestelbevestiging word na die e-posadres gestuur wat u invul.', 'DEMO: no money is charged. Your order confirmation will be sent to the email address you enter.');
     $('.order-intro').after(notice);
     $('#pay-button').textContent = tr('Toets demobetaling', 'Test demo payment');
     $('#payment-verification-note').textContent = tr('Hierdie toets simuleer ’n suksesvolle betaling. PayFast word nie gebruik nie en geen geld word gehef nie.', 'This test simulates a successful payment. PayFast is not used and no money is charged.');
@@ -306,7 +307,7 @@ async function startDemoPayment() {
   button.disabled = true;
   const dialog = $('#demo-payment-dialog');
   $('#demo-dialog-title').textContent = tr('Gaan voort met die demobetaling?', 'Proceed with this demo payment?');
-  $('#demo-dialog-copy').textContent = tr(`Geen geld word gehef nie. ’n Toetsbestelling word as betaal aangeteken. Die ouerbevestiging gaan na ${state.parent.email}; die personeelkennisgewing gaan na technical@awaldstudio.com.`, `No money will be charged. A test order will be recorded as paid. The parent confirmation will go to ${state.parent.email}; the staff notification will go to technical@awaldstudio.com.`);
+  $('#demo-dialog-copy').textContent = tr(`Geen geld word gehef nie. U toetsbestelling word aangeteken en u bestelbevestiging word na ${state.parent.email} gestuur.`, `No money will be charged. Your test order will be recorded and your order confirmation will be sent to ${state.parent.email}.`);
   $('#demo-cancel').textContent = tr('Kanselleer', 'Cancel');
   $('#demo-confirm').textContent = tr('Bevestig demobetaling', 'Confirm demo payment');
   const confirmed = await new Promise(resolve => {
@@ -326,7 +327,7 @@ async function startDemoPayment() {
     sessionStorage.setItem(`briljante_order_token_${state.order.reference}`,state.order.access_token);
     $('#step-3').hidden = true;
     const resultPanel = $('#demo-result'); resultPanel.hidden = false;
-    resultPanel.innerHTML = `<p class="phase-label">DEMO / TOETS</p><h2>${tr('Demobestelling voltooi','Demo order complete')}</h2><p>${tr('Geen geld is gehef nie. Hierdie bestelling is slegs vir toetsing as betaal aangeteken.','No money was charged. This order is recorded as paid for testing only.')}</p><div class="total-line"><span>${escapeHtml(state.order.reference)}</span><strong>${money.format(state.order.amount_cents/100)}</strong></div><p>${tr('Ouerbevestiging','Parent confirmation')}: <strong>${escapeHtml(state.parent.email)}</strong><br>${tr('Personeelkennisgewing','Staff notification')}: technical@awaldstudio.com</p><p role="status">${result.email?.sent === 2 ? tr('Die e-posbediener het albei boodskappe aanvaar. Kontroleer die inkassies en strooiposvouers.','The mail server accepted both messages. Please check the inboxes and spam folders.') : tr('Die bestelling is gestoor. E-posaflewering moet in die kennisgewingrekords nagegaan word; moenie outomaties weer stuur nie.','The order is saved. Email delivery needs checking in the notification records; do not resend automatically.')}</p><div class="button-row"><a class="btn btn-outline" href="/order/status/?reference=${encodeURIComponent(state.order.reference)}&lang=${language}">${tr('Bekyk bestelling','View order')}</a><a class="btn btn-primary" href="/admin/?lang=${language}">${tr('Maak administrasie oop','Open administration')}</a></div>`;
+    resultPanel.innerHTML = parentOrderResult({order:state.order,parent:state.parent,language});
   } catch(error) {
     message.textContent = error.message; button.disabled = false;
   }
