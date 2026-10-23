@@ -1,12 +1,15 @@
 import {createServer} from 'node:http';
 import {orderEmailContent,orderLogoCid} from '../api/_lib/order-email-design.js';
+import {calculateSchoolProgress} from '../api/_lib/school-payment-progress.js';
 const order={reference:'DEMO-BB-26-EXAMPLE1',status:'paid',amount_cents:66000,parent_first_name:'Demo',parent_last_name:'Parent',parent_email:'parent@example.test',parent_mobile:'0820000000',
   schools:{name:'Test School 1'},ordering_periods:{academic_years:{year:2027}},order_items:[
     {description_snapshot:'Graad 1 Werkboek - Graad 1',quantity:1,line_total_cents:32000,learners:{first_name:'Emma',last_name:'Example'}},
     {description_snapshot:'Graad 5 Werkboek - Graad 5',quantity:1,line_total_cents:34000,learners:{first_name:'Liam',last_name:'Example'}}]};
+order.school_progress=calculateSchoolProgress(Array.from({length:7},(_,i)=>({id:`offering-${i+1}`,grade_id:`grade-${i+1}`,active:true,expected_quantity:2,price_cents:i<3?32000:34000,grades:{name:`Grade ${i+1}`,sort_order:i+1}})),[
+  {offering_id:'offering-1',quantity:1,line_total_cents:32000},{offering_id:'offering-5',quantity:1,line_total_cents:34000}],'2026-10-23T10:00:00Z');
 createServer((req,res)=>{
   const review = /^\/review-(parent|staff)-(320|390|768)$/.exec(req.url);
-  if (review) {res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(`<html><head><title>Email responsive review</title></head><body style="margin:0;background:#dae2e8"><iframe title="${review[1]} email at ${review[2]} pixels" src="/${review[1]}" width="${review[2]}" height="2300" style="border:0;display:block"></iframe></body></html>`);return;}
+  if (review) {res.writeHead(200,{'Content-Type':'text/html; charset=utf-8'});res.end(`<html><head><title>Email responsive review</title></head><body style="margin:0;background:#dae2e8"><iframe title="${review[1]} email at ${review[2]} pixels" src="/${review[1]}" width="${review[2]}" height="3500" style="border:0;display:block"></iframe></body></html>`);return;}
   if(!['/parent','/staff'].includes(req.url)){res.writeHead(404);res.end();return;}
   const content=orderEmailContent(order,{parent:req.url==='/parent',demo:true,replyTo:'info@briljanteboeke.co.za',appOrigin:'https://briljante-preview-awaldstudio.vercel.app'});
   res.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'});

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {mailSettings,paidOrderMessage,createMailTransport,drainOrderMail,schedulePaidOrderMail} from '../api/_lib/order-mail.js';
 const settings={from:'orders@briljanteboeke.co.za',replyTo:'info@briljanteboeke.co.za',staff:['info@briljanteboeke.co.za']};
 const job={id:'11111111-1111-4111-8111-111111111111',kind:'parent_order_paid',recipient:'parent@example.com'};
-const order={reference:'BB-12345',status:'paid',paid_at:'2026-10-22',amount_cents:66000,parent_email:'parent@example.com',schools:{name:'Test School'}};
+const order={reference:'BB-12345',status:'paid',paid_at:'2026-10-22',amount_cents:66000,parent_email:'parent@example.com',schools:{name:'Test School'},school_progress:{captured_at:'2026-10-23T10:00:00Z',totals:{expected:2,paid:2,outstanding:0,expected_value_cents:66000,paid_value_cents:66000,outstanding_value_cents:0},grades:[]}};
 test('mail stays disabled without explicit activation and full sender configuration',()=>{
   assert.throws(()=>mailSettings({}),/not configured/);
   assert.throws(()=>mailSettings({MAIL_ENABLED:'true',SMTP_HOST:'mail.example.com',SMTP_USER:'user',SMTP_PASSWORD:'secret',MAIL_FROM:'other@example.com'}),/not configured/);

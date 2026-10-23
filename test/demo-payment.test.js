@@ -23,12 +23,15 @@ function database({foreignSchool=false,limit=true}={}){
     let row=tables.orders.find(o=>o.idempotency_key===p.p_idempotency_key);
     const reused=!!row;
     if(!row){row={id:'11111111-1111-4111-8111-111111111111',reference:'BB-26-12345678',amount_cents:32000,status:'pending_payment',school_id:demoSchoolId,order_access_hash:p.p_order_access_hash,idempotency_key:p.p_idempotency_key,
-      parent_email:p.p_parent.email,parent_first_name:p.p_parent.first_name,parent_last_name:p.p_parent.last_name,schools:{name:school.name}};tables.orders.push(row);}
+      ordering_period_id:period.id,parent_email:p.p_parent.email,parent_first_name:p.p_parent.first_name,parent_last_name:p.p_parent.last_name,schools:{name:school.name}};tables.orders.push(row);}
     return {data:{...row,reused}};
   },from(table){let filters=[],update,upsert;
+    const offering={id:body.learners[0].offering_id,school_id:demoSchoolId,ordering_period_id:period.id,grade_id:'grade-1',active:true,price_cents:32000,expected_quantity:2,grades:{name:'Grade 1',sort_order:1}};
+    if(table==='school_grade_offerings')tables[table]=[offering];
+    if(table==='order_items')tables[table]=tables.orders.map(o=>({id:'item-1',offering_id:offering.id,quantity:1,line_total_cents:32000,orders:o}));
     const run=()=>{if(upsert){for(const job of upsert)if(!tables[table].some(row=>row.id===job.id))tables[table].push({...job,status:'queued',attempts:0});return {data:null};}
-      const rows=tables[table].filter(row=>filters.every(([k,v])=>row[k]===v));if(update)rows.forEach(row=>Object.assign(row,update));return {data:rows};};
-    const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},is(k,v){return q.eq(k,v);},order(){return q;},lte(){return q;},limit(){return q;},
+      const rows=tables[table].filter(row=>filters.every(([k,v])=>k.split('.').reduce((a,b)=>a?.[b],row)===v));if(update)rows.forEach(row=>Object.assign(row,update));return {data:rows};};
+    const q={select(){return q;},eq(k,v){filters.push([k,v]);return q;},is(k,v){return q.eq(k,v);},order(){return q;},lte(){return q;},limit(){return q;},range(){return q;},like(){return q;},not(){return q;},
       update(v){update=v;return q;},upsert(v,options){assert.equal(options.ignoreDuplicates,true);upsert=v;return q;},
       async single(){const r=run();return {data:r.data[0]};},async maybeSingle(){const r=run();return {data:r.data[0]||null};},then(resolve,reject){return Promise.resolve(run()).then(resolve,reject);}};return q;
   }};

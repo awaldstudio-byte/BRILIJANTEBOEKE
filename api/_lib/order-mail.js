@@ -1,7 +1,9 @@
 import nodemailer from 'nodemailer';
 import { orderEmailContent } from './order-email-design.js';
+import { readSchoolPaymentProgress } from './school-payment-progress.js';
 
 const address = /^[A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
+export const paidOrderColumns = 'reference,status,paid_at,amount_cents,parent_first_name,parent_last_name,parent_email,parent_mobile,school_id,ordering_period_id,schools(name),ordering_periods(academic_years(year)),order_items(description_snapshot,quantity,line_total_cents,learners(first_name,last_name))';
 export function mailSettings(source = process.env) {
   const port = Number(source.SMTP_PORT || 465);
   const from = source.MAIL_FROM || '';
@@ -38,6 +40,7 @@ export function paidOrderMessage(job,order,settings) {
   if ((!parent && !staff) || (parent && recipient!==order.parent_email.toLowerCase()) || (staff && !settings.staff.includes(recipient))) {
     throw Object.assign(new Error('Notification recipient is not authorised.'),{code:'RECIPIENT_NOT_AUTHORISED'});
   }
+  if (staff && !order.school_progress) throw Object.assign(new Error('School progress is required for the staff notification.'),{code:'PROGRESS_LOOKUP_FAILED'});
   if (!/^[0-9a-f-]{36}$/i.test(job.id)) throw Object.assign(new Error('Invalid job identifier.'),{code:'INVALID_NOTIFICATION'});
   return {from:{name:'Briljante Boeke',address:settings.from},replyTo:settings.replyTo,to:job.recipient,
     subject:`${demo ? '[DEMO] ' : ''}Briljante Boeke — ${order.reference} — ${parent ? 'Order confirmation / Bestelbevestiging' : 'Payment confirmation / Betalingsbevestiging'}`,
@@ -63,8 +66,9 @@ export async function drainOrderMail(database,transport,settings,{limit=5,now=ne
     if(!claim.data){summary.skipped++;continue;}
     let accepted=false;
     try {
-      const result=await database.from('orders').select('reference,status,paid_at,amount_cents,parent_first_name,parent_last_name,parent_email,parent_mobile,school_id,schools(name),ordering_periods(academic_years(year)),order_items(description_snapshot,quantity,line_total_cents,learners(first_name,last_name))').eq('id',job.order_id).single();
+      const result=await database.from('orders').select(paidOrderColumns).eq('id',job.order_id).single();
       if(result.error) throw Object.assign(new Error('Order lookup failed.'),{code:'ORDER_LOOKUP_FAILED'});
+      if (job.kind === 'staff_order_paid') result.data.school_progress = await readSchoolPaymentProgress(database,result.data);
       const sent=await transport.sendMail(paidOrderMessage(job,result.data,settings));
       accepted=sent.accepted?.some(x=>String(x).toLowerCase()===job.recipient.toLowerCase())===true;
       if(!accepted) throw Object.assign(new Error('Mail server did not accept recipient.'),{code:'MAIL_NOT_ACCEPTED'});
