@@ -258,6 +258,7 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 }
 
 @media (max-width: 470px) {
+  .admin-header{padding:0 12px;gap:8px}.admin-brand img{width:95px}.admin-header .header-actions{gap:10px}.admin-header .language-switch button{min-width:34px;padding:6px 7px}.admin-user{gap:6px}.admin-user button{white-space:nowrap}#view-years .admin-title{flex-direction:column;gap:12px;margin-bottom:18px}
   .book-grid { grid-template-columns: 1fr; }
   .book-option { display: grid; grid-template-columns: 105px 1fr; }
   .book-option > img { height: 100%; aspect-ratio: auto; }
@@ -268,6 +269,8 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 }
 /* The purchase conditions are displayed inside checkout before affirmative acceptance. */
 #staff-access-title:focus{outline:none}
+#academic-year-form{margin-top:0}#academic-year-message.is-success{color:#176249}
+.academic-year-control{display:flex;align-items:center;gap:8px}.academic-year-control select{flex:1;min-width:0}.academic-year-control button{flex:0 0 auto;padding:10px;font-size:.8rem}.academic-years-list{list-style:none;margin:20px 0 0;padding:0;display:flex;flex-wrap:wrap;gap:10px}.academic-years-list li{padding:12px 20px;background:#f3f7fa;border:1px solid #d4e0eb;border-radius:6px;color:#18385f}
 .checkout-policy{padding:18px;background:#f3f7fa;border:1px solid #d4e0eb;border-radius:8px;font-size:14px;line-height:1.65;color:#274360}
 .checkout-policy h3{font-size:17px;margin:0 0 12px;color:#093464}
 .checkout-policy p{margin:0 0 12px}.checkout-policy p:last-child{margin-bottom:0}

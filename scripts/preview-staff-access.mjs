@@ -1,10 +1,18 @@
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, sep, extname } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import { academicYearValue } from '../api/_lib/academic-years.js';
 
 // Loopback-only UI fixture: no database, credentials, outbound mail or real data.
 const root=resolve(process.cwd());
-let signedIn=false, enrolled=false;
+const yearsFixture=process.argv.includes('--years');
+let signedIn=yearsFixture, enrolled=false;
+const years=[{id:'92cd8cf0-5a03-4a48-934a-3d27d1377b9a',year:2027,label:'2027 Academic Year',is_active:true}];
+const school={id:'11111111-1111-4111-8111-111111111111',name:'Local test school',slug:'local-test-school',status:'active',contact_name:'Test contact',contact_email:'test@example.test'};
+const period={id:'22222222-2222-4222-8222-222222222222',school_id:school.id,academic_year_id:years[0].id,name:'Parent orders',opens_at:'2026-09-01T08:00:00Z',closes_at:'2026-11-30T18:00:00Z',status:'open'};
+const grade={id:'33333333-3333-4333-8333-333333333333',name:'Grade 3',sort_order:3};
+const book={id:'44444444-4444-4444-8444-444444444444',grade_id:grade.id,title:'Test workbook',default_price_cents:32000,active:true};
 const staff=()=>({display_name:'Local UI test',role:'administrator',mfa_enabled:enrolled});
 const types={'.html':'text/html','.css':'text/css','.js':'text/javascript','.png':'image/png','.woff2':'font/woff2','.woff':'font/woff'};
 createServer(async(req,res)=>{
@@ -22,8 +30,17 @@ createServer(async(req,res)=>{
   }
   if(url.pathname.startsWith('/api/')){
     if(!signedIn)return json(401,{error:'Fixture is not signed in.'});
-    if(url.pathname==='/api/admin-dashboard')return json(200,{staff:staff(),summary:{active_schools:0,pending_orders:0,paid_orders:0,paid_total_cents:0},periods:[],recent_orders:[],progress:[]});
-    if(url.pathname==='/api/admin-schools')return json(200,{academic_years:[],grades:[],books:[],schools:[],periods:[],offerings:[],access_links:[]});
+    if(url.pathname==='/api/admin-schools'&&req.method==='POST'){
+      let raw='';for await(const chunk of req)raw+=chunk;
+      const body=JSON.parse(raw);if(body.action!=='create_academic_year')return json(400,{error:'Only year creation is supported in this fixture.'});
+      try{academicYearValue(body.year);}catch(error){return json(400,{error:error.message});}
+      const existing=years.find(year=>year.year===body.year);
+      if(existing)return json(200,{academic_year:existing,created:false});
+      const added={id:randomUUID(),year:body.year,label:`${body.year} Academic Year`,is_active:true};years.push(added);
+      return json(201,{academic_year:added,created:true});
+    }
+    if(url.pathname==='/api/admin-dashboard')return json(200,{staff:staff(),summary:{active_schools:yearsFixture?1:0,pending_orders:0,paid_orders:0,paid_total_cents:0},periods:[],recent_orders:[],progress:[]});
+    if(url.pathname==='/api/admin-schools')return json(200,{academic_years:years.toSorted((a,b)=>b.year-a.year),grades:yearsFixture?[grade]:[],books:yearsFixture?[book]:[],schools:yearsFixture?[school]:[],periods:yearsFixture?[period]:[],offerings:yearsFixture?[{ordering_period_id:period.id,grade_id:grade.id,book_id:book.id,price_cents:32000,expected_quantity:30,active:true}]:[],access_links:[]});
     if(url.pathname==='/api/admin-orders')return json(200,{orders:[]});
     if(url.pathname==='/api/admin-fulfilment')return json(200,{batches:[]});
     return json(404,{});

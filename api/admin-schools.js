@@ -5,6 +5,7 @@ import { env } from "./_lib/env.js";
 import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { optionalText, text, uuid } from "./_lib/validation.js";
+import { addAcademicYear, assertPeriodYear } from './_lib/academic-years.js';
 
 export default async function handler(req, res) {
   if (req.method === "GET") return list(req, res);
@@ -42,12 +43,20 @@ async function list(req, res) {
   }
 }
 
-async function save(req, res) {
+const save = createSchoolSaveHandler();
+export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize=requireStaff,databaseFactory=serviceClient}={}) {
+  return async function save(req, res) {
   try {
-    requireSameOrigin(req);
-    const { user } = await requireStaff(req, res, ["administrator"]);
-    const input = validate(await readJson(req, 64_000));
-    const database = serviceClient();
+    checkOrigin(req);
+    const { user, staff } = await authorize(req, res, ["administrator"]);
+    const body = await readJson(req, 64_000);
+    const database = databaseFactory();
+    if (body?.action === 'create_academic_year') {
+      const result = await addAcademicYear(database, {user,staff}, body);
+      return json(res, result.created ? 201 : 200, result);
+    }
+    const input = validate(body);
+    await assertPeriodYear(database, input.school.id, input.period);
 
     const { data: catalog, error: catalogError } = await database
       .from("books")
@@ -171,6 +180,7 @@ async function save(req, res) {
     const result = publicError(error);
     return json(res, result.status, { error: result.message });
   }
+}
 }
 
 function validate(body) {

@@ -68,7 +68,7 @@
     </main>
 
     <div id="admin-app" class="admin-shell" hidden>
-      <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="fulfilment">Aflewering</button><button data-view="reports">Verslae</button><button data-view="security" data-auth-copy="accountSecurity">Rekeningsekuriteit</button><span>Interne toegang vir Briljante Boeke</span></nav>
+      <nav class="admin-nav" aria-label="Administrasie"><button class="active" data-view="overview">Oorsig</button><button data-view="orders">Bestellings</button><button data-view="schools">Skole</button><button data-view="years">Akademiese jare</button><button data-view="fulfilment">Aflewering</button><button data-view="reports">Verslae</button><button data-view="security" data-auth-copy="accountSecurity">Rekeningsekuriteit</button><span>Interne toegang vir Briljante Boeke</span></nav>
       <main class="admin-main">
         <section id="view-overview" class="admin-view">
           <div class="admin-title"><div><p class="phase-label">BRILJANTE BOEKE ADMINISTRASIE</p><h1>Oorsig</h1></div><time id="today"></time></div>
@@ -100,6 +100,20 @@
         <section id="view-reports" class="admin-view" hidden>
           <div class="admin-title"><div><p class="phase-label">VERSLAE</p><h1>Betaalde kinderlyste</h1></div></div>
           <article class="data-card report-card"><p>Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.</p><div class="field-pair"><label>Skool<select id="report-school"><option value="">Alle skole</option></select></label><label>Bestelperiode<select id="report-period"><option value="">Alle periodes</option></select></label></div><a id="report-download" class="btn btn-primary" href="/api/admin-export">Laai CSV af</a></article>
+        </section>
+        <section id="view-years" class="admin-view" hidden>
+          <div class="admin-title"><h1>Akademiese jare</h1><button id="academic-year-back" class="btn btn-outline" type="button">Terug na skoolvorm</button></div>
+          <div class="school-admin-grid">
+            <article class="data-card"><h2>Beskikbare jare</h2><ul id="academic-year-list" class="academic-years-list"></ul></article>
+            <form id="academic-year-form" class="data-card form-stack" method="post">
+              <h2>Voeg akademiese jaar by</h2>
+              <p>Voeg ’n jaar vir nuwe bestelperiodes by. Bestaande skoolopstellings en bestellings bly aan hul oorspronklike jaar gekoppel.</p>
+              <label>Akademiese jaar<input id="academic-year-value" name="year" type="number" inputmode="numeric" min="2026" max="2100" step="1" required /></label>
+              <p class="auth-hint">Die jaar waarin die boeke gebruik sal word, nie noodwendig die jaar waarin betaling plaasvind nie.</p>
+              <button class="btn btn-primary" type="submit">Voeg jaar by</button>
+              <p id="academic-year-message" class="form-message" role="status" aria-live="polite"></p>
+            </form>
+          </div>
         </section>
         <section id="view-security" class="admin-view" hidden>
           <div class="admin-title"><h1 data-auth-copy="accountSecurity">Rekeningsekuriteit</h1></div>

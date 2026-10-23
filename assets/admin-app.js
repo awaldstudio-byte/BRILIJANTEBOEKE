@@ -1,4 +1,5 @@
 import { initStaffAccess } from './staff-access.js';
+import { initAcademicYears, periodForYear } from './academic-years.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -26,6 +27,9 @@ const englishStatic = new Map([
   ["Geen bestellings pas by die filter nie.", "No orders match the filter."], ["OPSTELLING", "SETUP"],
   ["Voeg skool by", "Add school"], ["Bestaande skole", "Existing schools"], ["SKOOL EN BESTELPERIODE", "SCHOOL AND ORDERING PERIOD"],
   ["Nuwe skool", "New school"], ["Skoolnaam", "School name"], ["Skakelfragment", "Link identifier"],
+  ['Akademiese jare','Academic years'],['Beskikbare jare','Available years'],['Voeg akademiese jaar by','Add academic year'],['Voeg jaar by','Add year'],['Terug na skoolvorm','Back to school form'],
+  ['Voeg ’n jaar vir nuwe bestelperiodes by. Bestaande skoolopstellings en bestellings bly aan hul oorspronklike jaar gekoppel.','Add a year for new ordering periods. Existing school settings and orders stay linked to their original year.'],
+  ['Die jaar waarin die boeke gebruik sal word, nie noodwendig die jaar waarin betaling plaasvind nie.','The year in which the books will be used, not necessarily the year payment is made.'],
   ["Kontakpersoon", "Contact person"], ["Kontak-e-pos", "Contact email"], ["Akademiese jaar", "Academic year"],
   ["Naam van bestelperiode", "Ordering period name"], ["Open vanaf", "Opens on"], ["Sluit op", "Closes on"],
   ["Konsep", "Draft"], ["Oop", "Open"], ["Gesluit", "Closed"], ["Geargiveer", "Archived"],
@@ -50,6 +54,7 @@ document.querySelector('input[name="class_required"]')?.closest("label")?.remove
 $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 const staffAccess = initStaffAccess({ language, onAuthenticated: async staff => { showAdmin(staff); await loadData(); } });
 $('#staff-enable-mfa').addEventListener('click', () => { if (!preview) staffAccess.startSetup(); });
+const academicYears = initAcademicYears({state,preview,api,tr,setView,escapeHtml});
 init();
 
 async function init() {
@@ -78,6 +83,7 @@ $("#logout-button").addEventListener("click", async () => {
 });
 
 function showAdmin(staff) {
+  state.staff = staff;
   $("#login-view").hidden = true;
   $("#admin-app").hidden = false;
   $("#admin-user").hidden = false;
@@ -140,7 +146,7 @@ function renderCatalog() {
     return `<button type="button" data-edit-school="${school.id}"><strong>${escapeHtml(school.name)}</strong><span>${escapeHtml(period ? `${localPeriod(period.name)} · ${localStatus(period.status)}${accessNote}` : tr("Geen bestelperiode", "No ordering period"))}</span></button>`;
   }).join("") || `<p class='quiet-text'>${tr("Geen skole is nog opgestel nie.", "No schools have been configured yet.")}</p>`;
 
-  $("#school-form [name=academic_year_id]").innerHTML = state.catalog.academic_years.map((year) => `<option value="${year.id}">${year.year}</option>`).join("");
+  academicYears.render();
   renderOfferingFields([]);
   updateReportLink();
   if (preview) setPreviewDownload($("#orders-export"), previewPaidLearnerRows(), "briljante-paid-learners");
@@ -315,6 +321,25 @@ function resetSchoolForm() {
   $("#generated-link").hidden = true;
   if (state.catalog) renderOfferingFields([]);
 }
+
+$('#school-form [name=academic_year_id]').addEventListener('change',()=>{
+  const form=$('#school-form');
+  if(!form.school_id.value)return;
+  const period=periodForYear(state.catalog.periods,form.school_id.value,form.academic_year_id.value);
+  form.period_id.value=period?.id||'';
+  form.period_name.value=period?.name||tr('Ouersbestellings','Parent orders');
+  form.opens_at.value=localDateTime(period?.opens_at);
+  form.closes_at.value=localDateTime(period?.closes_at);
+  form.period_status.value=period?.status||'draft';
+  form.delivery_note.value=period?.delivery_note||'';
+  form.replace_link.checked=false;
+  renderOfferingFields(state.catalog.offerings.filter(item=>item.ordering_period_id===period?.id));
+  $('#generated-link').hidden=true;
+  const year=state.catalog.academic_years.find(item=>item.id===form.academic_year_id.value)?.year;
+  $('#school-form-message').textContent=period
+    ?tr(`Bestelperiode vir ${year} gelaai.`,`Ordering period for ${year} loaded.`)
+    :tr(`Nuwe bestelperiode vir ${year}. Vul die datums en grade in; vorige jare bly onveranderd.`,`New ordering period for ${year}. Complete its dates and grades; previous years remain unchanged.`);
+});
 
 $("#school-form").addEventListener("submit", async (event) => {
   event.preventDefault();
