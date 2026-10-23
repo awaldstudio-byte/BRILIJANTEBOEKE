@@ -10,6 +10,8 @@ Adding a year updates only the year dropdown/list, preserving unsaved school-pro
 
 This is an additive create/list feature, not year renaming, deletion, archiving, period cloning, or a full annual rollover tool. No real academic year was created by the agent for testing.
 
+Report period options and the school list include the academic year to distinguish similarly named periods in different years. Underlying export filtering remains by the existing period identifier.
+
 ## Verification
 
 - 98 automated tests pass; 44 JavaScript files pass source/syntax checks. Added tests cover range/type validation, active administrator authorization, saved server-owned fields, audit creation, duplicate and repeated-request behaviour, database errors, unchanged historical periods and HTTP success/access boundaries.

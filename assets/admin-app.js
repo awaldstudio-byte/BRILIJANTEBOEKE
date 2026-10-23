@@ -136,14 +136,16 @@ function renderCatalog() {
   $("#report-school").insertAdjacentHTML("beforeend", schoolOptions);
   $("#report-period").insertAdjacentHTML("beforeend", state.catalog.periods.map((period) => {
     const school = state.catalog.schools.find((item) => item.id === period.school_id);
-    return `<option value="${period.id}">${escapeHtml(school?.name)} — ${escapeHtml(localPeriod(period.name))}</option>`;
+    const year = state.catalog.academic_years.find(item => item.id === period.academic_year_id)?.year;
+    return `<option value="${period.id}">${escapeHtml(school?.name)} — ${year ? `${escapeHtml(year)} · ` : ''}${escapeHtml(localPeriod(period.name))}</option>`;
   }).join(""));
 
   $("#school-list").innerHTML = state.catalog.schools.map((school) => {
     const period = latestPeriod(school.id);
     const access = period ? state.catalog.access_links.find((item) => item.ordering_period_id === period.id) : null;
+    const year = period && state.catalog.academic_years.find(item => item.id === period.academic_year_id)?.year;
     const accessNote = access?.code_hint ? ` · ${tr("kode eindig op", "code ending in")} ${access.code_hint}` : "";
-    return `<button type="button" data-edit-school="${school.id}"><strong>${escapeHtml(school.name)}</strong><span>${escapeHtml(period ? `${localPeriod(period.name)} · ${localStatus(period.status)}${accessNote}` : tr("Geen bestelperiode", "No ordering period"))}</span></button>`;
+    return `<button type="button" data-edit-school="${school.id}"><strong>${escapeHtml(school.name)}</strong><span>${escapeHtml(period ? `${year ? `${year} · ` : ''}${localPeriod(period.name)} · ${localStatus(period.status)}${accessNote}` : tr("Geen bestelperiode", "No ordering period"))}</span></button>`;
   }).join("") || `<p class='quiet-text'>${tr("Geen skole is nog opgestel nie.", "No schools have been configured yet.")}</p>`;
 
   academicYears.render();
