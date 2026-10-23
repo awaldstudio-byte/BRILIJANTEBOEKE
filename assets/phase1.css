@@ -219,6 +219,11 @@ legend { color: var(--navy); font-size: .8rem; font-weight: 700; }
 .share-actions { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; }
 .access-code { font-family: monospace; font-size: 1.05rem; font-weight: 800; letter-spacing: .08em; }
 .report-card { max-width: 760px; }
+.report-actions { display:flex;flex-wrap:wrap;align-items:center;gap:12px; }
+.report-raw { color:var(--navy);font-size:.85rem;text-underline-offset:4px;padding:10px 0; }
+.report-help { font-size:.88rem;line-height:1.6;margin-top:18px; }
+[data-report-download][aria-disabled="true"] { opacity:.5;cursor:not-allowed; }
+@media(max-width:640px){.admin-title:has(.report-actions){flex-direction:column;gap:16px}.report-actions .btn{min-width:110px}}
 .fulfilment-intro { max-width: 900px; margin-bottom: 16px; }
 .batch-actions { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; }
 

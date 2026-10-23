@@ -2,6 +2,7 @@ import { initStaffAccess } from './staff-access.js';
 import { initAcademicYears, periodForYear } from './academic-years.js';
 import { schoolOrderLink } from './school-links.js';
 import { initSchoolMaterials } from './school-materials.js';
+import { initReportDownloads } from './report-downloads.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -10,6 +11,7 @@ const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR"
 const shortDate = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 const $ = (selector) => document.querySelector(selector);
 const state = { dashboard: null, progress: [], catalog: null, orders: [], batches: [] };
+initReportDownloads({language});
 
 const englishStatic = new Map([
   ["Briljante Boeke Administrasie", "Briljante Boeke Administration"], ["Administrasie", "Administration"], ["Teken uit", "Sign out"], ["INTERNE TOEGANG", "INTERNAL ACCESS"],
@@ -45,6 +47,8 @@ const englishStatic = new Map([
   ["VERSLAE", "REPORTS"], ["Betaalde kinderlyste", "Paid child lists"],
   ["Laai ’n CSV-lys af met die betaalde kinders, grade, ouerbesonderhede en bestelverwysings. Die lys kan per skool of bestelperiode gefilter word.", "Download a CSV containing paid children, grades, parent details and order references. The list can be filtered by school or ordering period."],
   ["Bestelperiode", "Ordering period"], ["Alle periodes", "All periods"], ["Laai CSV af", "Download CSV"],
+  ['Laai ’n netjiese Excel- of PDF-leerderlys af. Skoollyste bevat Briljante en die skool se opgelaaide logo. Die gesamentlike Excel-verslag bevat ook ’n aparte interne transaksieblad.','Download a formatted Excel or PDF learner register. School reports include Briljante’s logo and the school’s uploaded logo. The combined Excel report also includes a separate internal transactions sheet.'],
+  ['Excel behou logo’s, kolomwydtes en filters. PDF is gereed om te druk of met die skool te deel. CSV bevat slegs rou data, sonder uitleg.','Excel retains logos, column widths and filters. PDF is ready to print or share with the school. CSV contains raw data only, without formatting.'],['CSV (rou data)','CSV (raw data)'],
   ["AFLEWERING", "FULFILMENT"], ["Skoolbestellings", "School orders"],
   ["Skep ’n afleweringsbatch vir een skool op ’n slag. Slegs betaalde boeke wat nog nie in ’n batch is nie, word ingesluit. Latere betalings bly beskikbaar vir die volgende batch.", "Create a fulfilment batch for one school at a time. Only paid books not already in a batch are included. Later payments remain available for the next batch."],
   ["Skep batch", "Create batch"], ["Batchnaam", "Batch name"], ["Skep afleweringsbatch", "Create fulfilment batch"], ["Bestaande batches", "Existing batches"],
@@ -137,13 +141,8 @@ function renderOverview() {
 
 function renderCatalog() {
   const schoolOptions = state.catalog.schools.map((school) => `<option value="${school.id}">${escapeHtml(school.name)}</option>`).join("");
-  $("#order-filters [name=school_id]").insertAdjacentHTML("beforeend", schoolOptions);
-  $("#report-school").insertAdjacentHTML("beforeend", schoolOptions);
-  $("#report-period").insertAdjacentHTML("beforeend", state.catalog.periods.map((period) => {
-    const school = state.catalog.schools.find((item) => item.id === period.school_id);
-    const year = state.catalog.academic_years.find(item => item.id === period.academic_year_id)?.year;
-    return `<option value="${period.id}">${escapeHtml(school?.name)} — ${year ? `${escapeHtml(year)} · ` : ''}${escapeHtml(localPeriod(period.name))}</option>`;
-  }).join(""));
+  for(const select of [$("#order-filters [name=school_id]"),$("#report-school")]){const selected=select.value;select.innerHTML=`<option value="">${tr('Alle skole','All schools')}</option>${schoolOptions}`;select.value=selected;}
+  renderReportPeriods();
 
   $("#school-list").innerHTML = state.catalog.schools.map((school) => {
     const period = latestPeriod(school.id);
@@ -154,7 +153,7 @@ function renderCatalog() {
   academicYears.render();
   renderOfferingFields([]);
   updateReportLink();
-  if (preview) setPreviewDownload($("#orders-export"), previewPaidLearnerRows(), "briljante-paid-learners");
+  for(const [id,format]of [['orders-export','xlsx'],['orders-export-pdf','pdf']]){const link=$(`#${id}`);link.href=`/api/admin-export?format=${format}&lang=${language}`;if(preview){link.setAttribute('aria-disabled','true');link.title=tr('Meld aan om geformateerde verslae af te laai.','Sign in to download formatted reports.');}}
   resetSchoolForm();
 }
 
@@ -188,7 +187,7 @@ function renderFulfilment() {
     const count = batch.fulfilment_batch_items?.[0]?.count ?? 0;
     const batchReport = preview
       ? `<a class="btn btn-outline" href="${escapeAttribute(previewCsvDownloadUrl(previewBatchRows(batch)))}" download="${previewCsvFilename("briljante-school-batch")}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`
-      : `<a class="btn btn-outline" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}">${tr("Laai batch-CSV af", "Download batch CSV")}</a>`;
+      : ['xlsx','pdf','csv'].map(format=>`<a data-report-download class="${format==='csv'?'report-raw':'btn btn-outline'}" href="/api/admin-export?report=batch&batch_id=${encodeURIComponent(batch.id)}&format=${format}&lang=${language}">${format==='xlsx'?'Excel (.xlsx)':format==='pdf'?'PDF':tr('CSV (rou data)','CSV (raw data)')}</a>`).join('');
     return `<article><strong>${escapeHtml(batch.schools?.name)} · ${escapeHtml(batch.label)}</strong><span>${escapeHtml(batch.ordering_periods?.academic_years?.year)} · ${escapeHtml(localFulfilmentStatus(batch.status))} · ${count} ${tr("boeke", "books")}</span><div class="batch-actions">${batchReport}<select data-batch-status="${batch.id}" aria-label="${tr("Batchstatus", "Batch status")}">${["created", "packing", "ready", "dispatched", "delivered", "cancelled"].map((status) => `<option value="${status}" ${batch.status === status ? "selected" : ""}>${escapeHtml(localFulfilmentStatus(status))}</option>`).join("")}</select></div></article>`;
   }).join("") || `<p class="quiet-text">${tr("Geen afleweringsbatches is nog geskep nie.", "No fulfilment batches have been created yet.")}</p>`;
 }
@@ -412,21 +411,28 @@ $("#school-form").addEventListener("submit", async (event) => {
 
 $("[data-copy-link]").addEventListener("click", async (event) => copyAccess(event.currentTarget, $("[data-generated-url]").value));
 
-$("#report-school").addEventListener("change", updateReportLink);
+$("#report-school").addEventListener("change", () => {renderReportPeriods();updateReportLink();});
 $("#report-period").addEventListener("change", updateReportLink);
+function renderReportPeriods(){
+  const selected=$('#report-period').value,schoolId=$('#report-school').value;
+  $('#report-period').innerHTML=`<option value="">${tr('Alle periodes','All periods')}</option>`+state.catalog.periods.filter(period=>!schoolId||period.school_id===schoolId).map(period=>{const school=state.catalog.schools.find(row=>row.id===period.school_id),year=state.catalog.academic_years.find(row=>row.id===period.academic_year_id)?.year;return `<option value="${period.id}">${escapeHtml(school?.name)} — ${escapeHtml(year)} · ${escapeHtml(localPeriod(period.name))}</option>`;}).join('');
+  if([...$('#report-period').options].some(option=>option.value===selected))$('#report-period').value=selected;
+}
 function updateReportLink() {
   if (preview) {
-    setPreviewDownload($("#report-download"), previewPaidLearnerRows({ schoolId: $("#report-school").value, periodId: $("#report-period").value }), "briljante-paid-learners");
+    for(const id of ['report-download','report-pdf']){$(`#${id}`).setAttribute('aria-disabled','true');$(`#${id}`).title=tr('Meld aan om geformateerde verslae af te laai.','Sign in to download formatted reports.');}
+    $('#report-csv').removeAttribute('data-report-download');
+    setPreviewDownload($("#report-csv"), previewPaidLearnerRows({ schoolId: $("#report-school").value, periodId: $("#report-period").value }), "briljante-paid-learners");
     return;
   }
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({lang:language});
   if ($("#report-school").value) params.set("school_id", $("#report-school").value);
   if ($("#report-period").value) params.set("period_id", $("#report-period").value);
-  $("#report-download").href = `/api/admin-export?${params}`;
+  for(const [id,format]of [['report-download','xlsx'],['report-pdf','pdf'],['report-csv','csv']]){params.set('format',format);$(`#${id}`).href=`/api/admin-export?${params}`;}
 }
 
 function previewPaidLearnerRows({ schoolId = "", periodId = "" } = {}) {
-  const rows = [["School", "Academic year", "Ordering period", "Grade", "Learner first name", "Learner surname", "Parent first name", "Parent surname", "Parent email", "Parent mobile", "Order reference", "Order total", "Paid at"]];
+  const rows = [["School", "Academic year", "Ordering period", "Grade", "Learner first name", "Learner surname", "Parent first name", "Parent surname", "Parent email", "Parent mobile", "Order reference", "Paid at"]];
   for (const order of previewOrders().orders) {
     if (order.status !== "paid") continue;
     if (schoolId && order.school_id !== schoolId) continue;
@@ -443,7 +449,6 @@ function previewPaidLearnerRows({ schoolId = "", periodId = "" } = {}) {
       order.parent_email,
       order.parent_mobile,
       order.reference,
-      (order.amount_cents / 100).toFixed(2),
       order.paid_at,
     ]);
   }
