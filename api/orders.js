@@ -5,17 +5,20 @@ import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { validateOrderInput } from "./_lib/validation.js";
 import { resolveSchoolOrdering, internalSchoolOrderHash } from './_lib/school-ordering.js';
 import { createDemoPaymentHandler } from './_lib/demo-payment-handler.js';
+import { createSandboxOrderHandler } from './_lib/sandbox-order-handler.js';
 
 export default createOrderHandler();
-export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), demoHandler = createDemoPaymentHandler() } = {}) {
+export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), demoHandler = createDemoPaymentHandler(), sandboxHandler = createSandboxOrderHandler() } = {}) {
 return async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
 
   try {
     const body = await readJson(req);
+    if (body.confirm_sandbox === true) return sandboxHandler(req,res,body);
     if (body.confirm_demo === true) { req.body = body; return demoHandler(req,res); }
     const input = validateOrderInput(body);
     const config = checkPayments(configuration());
+    if (config.payfastMode === 'sandbox') throw Object.assign(new Error('Sandbox orders require the authorised technical test flow.'), { statusCode: 403 });
     const orderToken = deriveOrderToken(input.idempotencyKey, config.orderTokenSecret);
     const database = databaseFactory();
     let tokenHash = input.schoolToken ? sha256(input.schoolToken) : null;

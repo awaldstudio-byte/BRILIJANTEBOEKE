@@ -1,15 +1,22 @@
-import { requireStaff } from "./_lib/auth.js";
-import { json, methodNotAllowed, publicError } from "./_lib/http.js";
+import { requireStaff, requireSameOrigin } from "./_lib/auth.js";
+import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { paidOrderColumns, paidOrderMessage } from './_lib/order-mail.js';
 import { readSchoolPaymentProgress } from './_lib/school-payment-progress.js';
 import { env } from './_lib/env.js';
+import { recordFullRefund } from './_lib/refund-reconciliation.js';
 
-export default async function handler(req, res) {
-  if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
+export function createAdminOrdersHandler({ authorize = requireStaff, checkOrigin = requireSameOrigin, databaseFactory = serviceClient, now = Date.now } = {}) {
+return async function handler(req, res) {
+  if (!["GET", "POST"].includes(req.method)) return methodNotAllowed(res, ["GET", "POST"]);
   try {
-    await requireStaff(req, res);
-    const database = serviceClient();
+    if (req.method === 'POST') checkOrigin(req);
+    const { user } = await authorize(req, res, req.method === 'POST' ? ['administrator'] : ['administrator', 'viewer']);
+    const database = databaseFactory();
+    if (req.method === 'POST') {
+      const refund = await recordFullRefund(database, await readJson(req, 4000), user.id, now());
+      return json(res, refund.reused ? 200 : 201, { refund, money_moved: false });
+    }
     // Authenticated read-only rendering for checking a notification without
     // resending it or changing any order/queue record.
     if (typeof req.query.email_preview === 'string') {
@@ -32,7 +39,7 @@ export default async function handler(req, res) {
     let query = database
       .from("orders")
       .select(
-        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name))",
+        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name)), payment_attempts(provider_payment_id,status), order_refunds(provider_refund_reference,refunded_at,amount_cents,recorded_at)",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
@@ -54,4 +61,6 @@ export default async function handler(req, res) {
     const result = publicError(error);
     return json(res, result.status, { error: result.message });
   }
+};
 }
+export default createAdminOrdersHandler();

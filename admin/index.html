@@ -22,6 +22,7 @@
         <form id="staff-email-form" class="auth-step" method="post">
           <label><span data-auth-copy="email">E-posadres</span><input id="staff-email" name="email" type="email" autocomplete="username" inputmode="email" maxlength="254" required /></label>
           <button class="btn btn-primary btn-full" type="submit" data-auth-copy="continue">Gaan voort</button>
+          <button id="staff-recover-email" class="auth-link" type="button" data-auth-copy="setupReset">Wagwoord vergeet?</button>
         </form>
         <form id="staff-setup-form" class="auth-step" method="post" hidden>
           <label class="checkbox-field"><input id="staff-setup-remember" type="checkbox" /><span data-auth-copy="remember">Onthou hierdie toestel vir 30 dae</span></label>
@@ -34,7 +35,7 @@
           <label class="checkbox-field"><input id="staff-remember" type="checkbox" /><span data-auth-copy="remember">Onthou hierdie toestel vir 30 dae</span></label>
           <p class="auth-hint" data-auth-copy="sharedDevice">Moenie hierdie opsie op ’n gedeelde of openbare toestel gebruik nie.</p>
           <button class="btn btn-primary btn-full" type="submit" data-auth-copy="signIn">Meld aan</button>
-          <button id="staff-request-code" class="auth-link" type="button" data-auth-copy="setupReset">Eerste toegang of wagwoord vergeet?</button>
+          <button id="staff-request-code" class="auth-link" type="button" data-auth-copy="setupReset">Wagwoord vergeet?</button>
           <button class="auth-link" type="button" data-auth-start-over data-auth-copy="differentEmail">Gebruik ’n ander e-posadres</button>
         </form>
         <form id="staff-code-form" class="auth-step" method="post" hidden>

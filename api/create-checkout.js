@@ -4,6 +4,7 @@ import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { checkoutRequest } from "./_lib/payfast.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { validateStatusInput } from "./_lib/validation.js";
+import { requireSandboxAccess, assertPaymentEnvironment } from './_lib/sandbox-payment.js';
 
 export default async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
@@ -11,15 +12,17 @@ export default async function handler(req, res) {
   try {
     const input = validateStatusInput(await readJson(req));
     const config = requirePayFast(env());
+    if (config.payfastMode === 'sandbox') await requireSandboxAccess(req,res);
     const database = serviceClient();
     const { data: order, error: orderError } = await database
       .from("orders")
-      .select("id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile")
+      .select("id, reference, amount_cents, status, school_id, idempotency_key, parent_first_name, parent_last_name, parent_email, parent_mobile")
       .eq("reference", input.reference)
       .eq("order_access_hash", sha256(input.orderToken))
       .maybeSingle();
     assertDatabaseResult(orderError);
     if (!order) return json(res, 404, { error: "Order not found." });
+    assertPaymentEnvironment(order,config.payfastMode);
     if (order.status === "paid") return json(res, 409, { error: "This order has already been paid." });
     if (order.status !== "pending_payment" && order.status !== "payment_failed") {
       return json(res, 409, { error: "This order cannot be paid in its current state." });

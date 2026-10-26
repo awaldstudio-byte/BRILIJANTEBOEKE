@@ -3,6 +3,7 @@ import { json, methodNotAllowed, publicError } from './_lib/http.js';
 import { assertDatabaseResult, serviceClient } from './_lib/supabase.js';
 import { resolveSchoolOrdering } from './_lib/school-ordering.js';
 import { canDemoPay } from './_lib/demo-payment.js';
+import { canSandboxPay } from './_lib/sandbox-payment.js';
 
 export default createPublicSchoolHandler();
 export function createPublicSchoolHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
@@ -21,10 +22,16 @@ export function createPublicSchoolHandler({ databaseFactory = serviceClient, con
         .order('sort_order', { referencedTable: 'grades', ascending: true });
       assertDatabaseResult(error);
       let paymentsEnabled = false;
-      try { checkPayments(configuration()); paymentsEnabled = true; } catch { /* Checkout remains disabled until configured. */ }
+      let sandboxEnabled = false;
+      try {
+        const settings = checkPayments(configuration());
+        sandboxEnabled = settings?.payfastMode === 'sandbox' && open && await canSandboxPay(req,res,school);
+        paymentsEnabled = settings?.payfastMode !== 'sandbox' || sandboxEnabled;
+      } catch { /* Checkout remains disabled until configured. */ }
       return json(res, 200, {
         payments_enabled: paymentsEnabled,
-        demo_payments_enabled: open && await canDemoPay(req,res,school),
+        sandbox_payments_enabled: sandboxEnabled,
+        demo_payments_enabled: !sandboxEnabled && open && await canDemoPay(req,res,school),
         school: { slug: school.slug, name: school.name },
         period: { id: period.id, name: period.name, academic_year: period.academic_years, opens_at: period.opens_at,
           closes_at: period.closes_at, delivery_note: period.delivery_note, open },

@@ -4,6 +4,9 @@ import { forwardedIp, parseNotification, verifyNotification } from "./_lib/payfa
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { waitUntil } from "@vercel/functions";
 import { schedulePaidOrderMail } from "./_lib/order-mail.js";
+import { assertPaymentEnvironment } from './_lib/sandbox-payment.js';
+import { scheduleSandboxMail } from './_lib/sandbox-mail.js';
+import { demoStaffEmail } from './_lib/demo-payment.js';
 
 export const config = { api: { bodyParser: false } };
 
@@ -20,11 +23,12 @@ export default async function handler(req, res) {
     const database = serviceClient();
     const { data: attempt, error: attemptError } = await database
       .from("payment_attempts")
-      .select("id, order_id, amount_cents, status, orders(id, reference, status, parent_email)")
+      .select("id, order_id, amount_cents, status, orders(id, reference, status, parent_email, school_id, idempotency_key)")
       .eq("merchant_payment_id", reference)
       .maybeSingle();
     assertDatabaseResult(attemptError);
     if (!attempt) return res.status(200).send("OK");
+    try { assertPaymentEnvironment(attempt.orders,settings.payfastMode); } catch { return res.status(200).send('OK'); }
 
     const verification = await verifyNotification({
       rawBody,
@@ -49,11 +53,12 @@ export default async function handler(req, res) {
       p_verification_state: verification.valid ? "verified" : "rejected",
       p_rejection_reason: verification.reasons.join(","),
       p_raw_payload: verification.data,
-      p_staff_recipients: settings.notificationEmails,
+      p_staff_recipients: settings.payfastMode === 'sandbox' ? [demoStaffEmail] : settings.notificationEmails,
     });
     assertDatabaseResult(processError);
 
-    schedulePaidOrderMail({
+    const sendMail = settings.payfastMode === 'sandbox' ? scheduleSandboxMail : schedulePaidOrderMail;
+    sendMail({
       database, orderId: attempt.order_id,
       verified: verification.valid,
       paymentStatus: verification.data.payment_status,

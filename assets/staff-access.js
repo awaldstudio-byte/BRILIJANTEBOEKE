@@ -5,7 +5,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
     staffOnly: ['PERSONEELTOEGANG','STAFF ACCESS'], email:['E-posadres','Email address'], continue:['Gaan voort','Continue'],
     password:['Wagwoord','Password'], remember:['Onthou hierdie toestel vir 30 dae','Remember this device for 30 days'],
     sharedDevice:['Moenie hierdie opsie op ’n gedeelde of openbare toestel gebruik nie.','Do not use this option on a shared or public device.'],
-    signIn:['Meld aan','Sign in'], setupReset:['Eerste toegang of wagwoord vergeet?','First-time access or forgotten password?'],
+    signIn:['Meld aan','Sign in'], setupReset:['Wagwoord vergeet?','Forgot password?'],
     differentEmail:['Gebruik ’n ander e-posadres','Use a different email'], emailCode:['E-posverifikasiekode','Email verification code'],
     verifyEmail:['Verifieer e-posadres','Verify email'], resend:['Stuur ’n nuwe kode','Send a new code'], newPassword:['Nuwe wagwoord','New password'],
     confirmPassword:['Bevestig wagwoord','Confirm password'], savePassword:['Stoor wagwoord','Save password'],
@@ -13,7 +13,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
     scanQr:['Voeg Briljante Boeke by u verifikasie-app deur die QR-kode te skandeer.','Add Briljante Boeke to your authenticator app by scanning this QR code.'],
     manualKey:['Kan u nie die kode skandeer nie?','Unable to scan the code?'], setupKey:['Opstelsleutel — hou dit privaat','Setup key — keep this private'],
     authenticatorCode:['Kode uit u verifikasie-app','Code from your authenticator app'],verifySignIn:['Verifieer en meld aan','Verify and sign in'],
-    lostAuthenticator:['As u toegang tot u verifikasie-app verloor het, kontak tegniese ondersteuning.','If you have lost access to your authenticator app, contact technical support.'],
+    lostAuthenticator:['As u toegang tot u verifikasie-app verloor het, kontak tegniese ondersteuning vir identiteitsverifikasie. E-posverifikasie verwyder nie ’n bestaande verifikasie-app nie. Moenie u wagwoord, kode of opstelsleutel stuur nie.','If you have lost access to your authenticator app, contact technical support for identity verification. Email verification does not remove an enabled authenticator. Do not send your password, code or setup key.'],
     support:['Tegniese ondersteuning','Technical support'],privacy:['Privaatheid','Privacy'],
     optionalMfa:['’n Verifikasie-app beskerm u rekening indien u wagwoord gesteel word. U kan dit nou of later onder Rekeningsekuriteit opstel.','An authenticator protects your account if your password is stolen. You can set it up now or later under Account security.'],
     enableMfa:['Stel tweestapverifikasie op','Set up two-step verification'],setUpLater:['Stel later op','Set up later'],
@@ -23,7 +23,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
   };
   for (const node of document.querySelectorAll('[data-auth-copy]')) node.textContent = copy[node.dataset.authCopy][en ? 1 : 0];
   for (const node of document.querySelectorAll('[data-toggle-password]')) node.textContent = en ? 'Show' : 'Wys';
-  let email = '', factorId = '', busy = false, resendAfter = 0, fromDashboard = false, setupRemember = false;
+  let email = '', factorId = '', busy = false, resendAfter = 0, fromDashboard = false, setupRemember = false, recovering = false;
   const text = (af, english) => en ? english : af;
   const forms = { email: $('#staff-email-form'), setup: $('#staff-setup-form'), password: $('#staff-password-form'), code: $('#staff-code-form'),
     'new-password': $('#staff-new-password-form'), 'mfa-choice': $('#staff-mfa-choice'), 'mfa-code': $('#staff-mfa-form') };
@@ -32,7 +32,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
     'mfa-code':text('Tweestapverifikasie','Two-step verification'), 'mfa-choice':text('Tweestapverifikasie','Two-step verification') };
   const intros = { email:text('Voer u goedgekeurde e-posadres in om voort te gaan.','Enter your approved email address to continue.'),
     setup:text('U e-posadres is goedgekeur. Verifieer eers u e-posadres; daarna kan u ’n veilige wagwoord kies.','Your email address is approved. Verify your email first, then choose a secure password.'),
-    password:text('Gebruik u wagwoord, of kies rekeningopstelling vir eerste toegang.','Use your password, or choose account setup for first-time access.'),
+    password:text('Gebruik u wagwoord om aan te meld. Indien u dit vergeet het, vra ’n e-posverifikasiekode aan.','Use your password to sign in. If you have forgotten it, request an email verification code.'),
     code:text('Indien hierdie adres goedgekeur is, sal ’n kode gestuur word. Kyk ook in u strooipos. Die kode verval oor 15 minute.','If this address is approved, a code will be sent. Check your inbox and spam folder. The code expires in 15 minutes.'),
     'new-password':text('U e-posadres is geverifieer. Kies ’n unieke wagwoord.','Your email is verified. Choose a unique password.'),
     'mfa-code':text('Verifieer u identiteit om toegang tot die administrasie te kry.','Verify your identity to access administration.'),
@@ -40,8 +40,14 @@ export function initStaffAccess({ language, onAuthenticated }) {
   function stage(name, focus = true) {
     for (const [key, form] of Object.entries(forms)) form.hidden = key !== name;
     $('#login-message').textContent = '';
-    $('#staff-access-title').textContent = headings[name];
-    $('#staff-access-intro').textContent = intros[name];
+    $('#staff-access-title').textContent = recovering && name === 'new-password' ? text('Herstel u wagwoord','Reset your password') : headings[name];
+    $('#staff-access-intro').textContent = recovering && name === 'code'
+      ? text('Indien hierdie adres ’n goedgekeurde rekening het, sal ’n kode gestuur word. Voer dit hier binne 15 minute in. ’n Bestaande verifikasie-app sal ook vereis word.','If this address has an approved account, a code will be sent. Enter it here within 15 minutes. An existing authenticator will also be required.')
+      : recovering && name === 'mfa-code'
+        ? text('Voer die kode uit u bestaande verifikasie-app in voordat u ’n nuwe wagwoord kies.','Enter the code from your existing authenticator before choosing a new password.')
+        : recovering && name === 'new-password'
+          ? text('Kies ’n unieke nuwe wagwoord. Ander aangemelde sessies sal afgemeld word. ’n Bestaande verifikasie-app bly geaktiveer.','Choose a unique new password. Other signed-in sessions will be signed out. Your authenticator remains enabled if you have one.')
+          : intros[name];
     $('#staff-email-summary').textContent = email;
     $('#staff-email-summary').hidden = !email || name === 'email';
     if (focus) $('#staff-access-title').focus();
@@ -70,12 +76,13 @@ export function initStaffAccess({ language, onAuthenticated }) {
     finally { busy = false; document.querySelectorAll('.auth-step button').forEach(button => button.disabled = false); }
   }
   async function next(result) {
+    if (result.recovery === true) recovering = true;
     if (result.next === 'dashboard') {
       $('#staff-mfa-qr').removeAttribute('src'); $('#staff-mfa-key').value = '';
-      forms['mfa-code'].reset(); factorId = ''; fromDashboard = false;
+      forms['mfa-code'].reset(); factorId = ''; fromDashboard = false; recovering = false;
       await onAuthenticated(result.staff); return;
     }
-    if (result.next === 'mfa') {
+    if (result.next === 'mfa' || result.next === 'recovery') {
       await next(await request('mfa-options')); return;
     }
     if (result.next === 'mfa-code') {
@@ -84,6 +91,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
       $('#staff-mfa-skip').hidden = !result.can_skip;
       $('#staff-mfa-cancel').hidden = !result.can_cancel;
       $('#staff-mfa-qr').removeAttribute('src'); $('#staff-mfa-key').value = '';
+      forms['mfa-code'].querySelector('button[type="submit"]').textContent = recovering ? text('Verifieer en gaan voort','Verify and continue') : copy.verifySignIn[en ? 1 : 0];
       if (result.enrolling && result.qr_code?.startsWith('data:image/svg+xml')) {
         $('#staff-mfa-qr').src = result.qr_code; $('#staff-mfa-key').value = result.manual_key;
       }
@@ -97,6 +105,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
   }
   forms.email.addEventListener('submit', event => {
     event.preventDefault(); run(async () => {
+      recovering = false;
       email = $('#staff-email').value.trim().toLowerCase();
       const result=await request('email-check',{email});
       await next(result);
@@ -105,6 +114,7 @@ export function initStaffAccess({ language, onAuthenticated }) {
   });
   forms.password.addEventListener('submit', event => {
     event.preventDefault(); run(async () => {
+      recovering = false;
       const password = $('#staff-password').value;
       try { await next(await request('password',{email,password,remember:$('#staff-remember').checked})); }
       finally { $('#staff-password').value = ''; }
@@ -114,11 +124,14 @@ export function initStaffAccess({ language, onAuthenticated }) {
     if (Date.now() < resendAfter) throw new Error(text('Wag asseblief ’n minuut voordat u weer ’n kode aanvra.','Please wait a minute before requesting another code.'));
     if(!forms.setup.hidden)setupRemember=$('#staff-setup-remember').checked;
     else if(!forms.password.hidden)setupRemember=$('#staff-remember').checked;
-    const result = await request('request-code',{email,remember:setupRemember});
+    const result = await request(recovering ? 'request-recovery' : 'request-code',{email,remember:setupRemember});
     resendAfter = Date.now() + 60000; $('#staff-password').value = ''; await next(result);
   }
-  $('#staff-request-code').addEventListener('click',() => run(sendCode));
-  forms.setup.addEventListener('submit',event=>{event.preventDefault();run(sendCode);});
+  $('#staff-request-code').addEventListener('click',() => run(async () => { recovering = true; await sendCode(); }));
+  $('#staff-recover-email').addEventListener('click',() => run(async () => {
+    email = $('#staff-email').value.trim().toLowerCase(); recovering = true; setupRemember = false; await sendCode();
+  }));
+  forms.setup.addEventListener('submit',event=>{event.preventDefault();recovering=false;run(sendCode);});
   $('#staff-resend-code').addEventListener('click',() => run(sendCode));
   forms.code.addEventListener('submit',event => { event.preventDefault(); run(async () => {
     const code = $('#staff-email-code').value; $('#staff-email-code').value = '';
@@ -138,7 +151,10 @@ export function initStaffAccess({ language, onAuthenticated }) {
   for (const id of ['#staff-choice-skip','#staff-mfa-skip']) $(id).addEventListener('click',() => run(async () => next(await request('mfa-skip'))));
   for (const id of ['#staff-choice-cancel','#staff-mfa-cancel']) $(id).addEventListener('click',() => run(async () => next(await request('status'))));
   for (const button of document.querySelectorAll('[data-auth-start-over]')) button.addEventListener('click',() => {
-    email = ''; setupRemember = false; forms.password.reset(); forms.setup.reset(); stage('email'); $('#staff-email').focus();
+    email = ''; setupRemember = false; recovering = false; factorId = '';
+    forms.password.reset(); forms.setup.reset(); forms.code.reset(); forms['new-password'].reset(); forms['mfa-code'].reset();
+    $('#staff-mfa-qr').removeAttribute('src'); $('#staff-mfa-key').value = '';
+    stage('email'); $('#staff-email').focus();
   });
   for (const button of document.querySelectorAll('[data-toggle-password]')) button.addEventListener('click',() => {
     const field = document.getElementById(button.dataset.togglePassword);

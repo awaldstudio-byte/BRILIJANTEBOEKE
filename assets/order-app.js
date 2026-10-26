@@ -95,7 +95,15 @@ function renderBase() {
   $("#period-summary").textContent = tr(`Bestellings sluit ${date.format(new Date(period.closes_at))}`, `Orders close ${date.format(new Date(period.closes_at))}`);
   $("#book-count").textContent = tr(`${offerings.length} ${offerings.length === 1 ? "graad" : "grade"} beskikbaar`, `${offerings.length} ${offerings.length === 1 ? "grade" : "grades"} available`);
   $("#checkout-delivery-note").textContent = `${tr("Skoolaflewering", "School delivery")}: ${period.delivery_note || tr("Boeke word in grootmaat by die skool afgelewer; die skool se bevestigde afleweringsreëlings geld.", "Books are delivered to the school in bulk; the school's confirmed delivery arrangements apply.")}`;
-  if (state.config.demo_payments_enabled === true) {
+  if (state.config.sandbox_payments_enabled === true) {
+    const notice = document.createElement('p');
+    notice.className = 'notice-card payment-unavailable';
+    notice.setAttribute('role','status');
+    notice.textContent = tr('PAYFAST-TOETS: gebruik slegs fiktiewe leerderbesonderhede en die goedgekeurde toetsposbus. Geen regte geld word gehef nie.', 'PAYFAST SANDBOX: use fictional learner details and the approved test mailbox only. No real money is charged.');
+    $('.order-intro').after(notice);
+    $('#pay-button').textContent = tr('Toets PayFast', 'Test PayFast sandbox');
+    $('#payment-verification-note').textContent = tr('PayFast se toetsomgewing word gebruik. Slegs ’n geverifieerde toetskennisgewing kan hierdie bestelling as betaal merk.', 'PayFast sandbox will open. Only a verified sandbox payment notification can mark this test order as paid.');
+  } else if (state.config.demo_payments_enabled === true) {
     const notice = document.createElement('p');
     notice.className = 'notice-card payment-unavailable';
     notice.setAttribute('role', 'status');
@@ -288,7 +296,7 @@ async function startPayment() {
   message.textContent = "";
   try {
     if (!state.order) {
-      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ school_identifier: state.config.school.slug, ordering_period_id: state.config.period.id, request_id: state.requestId, parent: state.parent, consent: state.consent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
+      const result = await api("/api/orders", { method: "POST", body: JSON.stringify({ ...(state.config.sandbox_payments_enabled ? {confirm_sandbox:true} : {}), school_identifier: state.config.school.slug, ordering_period_id: state.config.period.id, request_id: state.requestId, parent: state.parent, consent: state.consent, learners: state.learners.map(({ id, ...learner }) => learner) }) });
       state.order = result.order;
       sessionStorage.setItem(`briljante_order_token_${state.order.reference}`, state.order.access_token);
     }

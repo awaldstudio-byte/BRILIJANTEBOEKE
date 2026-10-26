@@ -60,7 +60,10 @@ export async function loadStaffSession(req, res, { database = serviceClient(), a
   const sessionResult = await database.from('staff_login_sessions').select('*').eq('token_hash', tokenHash(secret)).maybeSingle();
   assertDatabaseResult(sessionResult.error);
   const record = sessionResult.data;
-  if (!record || record.revoked_at || Date.parse(record.expires_at) <= Date.now()) throw authDenied();
+  if (!record || record.revoked_at || !Number.isFinite(Date.parse(record.expires_at)) || Date.parse(record.expires_at) <= Date.now()) {
+    clearSessionCookies(res);
+    throw authDenied();
+  }
   const approvalResult = await database.from('staff_access_approvals').select('*').eq('id', record.approval_id).eq('active', true).maybeSingle();
   assertDatabaseResult(approvalResult.error);
   const approval = approvalResult.data;

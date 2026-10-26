@@ -37,7 +37,7 @@ export function requirePayFast(config = env()) {
   if (!config.payfastMerchantId?.trim() || !config.payfastMerchantKey?.trim() || !config.payfastPassphrase?.trim()) {
     throw paymentUnavailable();
   }
-  if (config.payfastMode === "live" && (!config.payfastLiveEnabled || config.payfastMerchantId === "10000100")) {
+  if (config.payfastMode === "live" && (!config.payfastLiveEnabled || ["10000100", "10004002"].includes(config.payfastMerchantId))) {
     throw paymentUnavailable();
   }
   let origin;

@@ -142,8 +142,8 @@ input:focus, select:focus, textarea:focus { border-color: var(--turquoise); box-
 .login-card { width: min(430px, 100%); border: 1px solid var(--line); border-radius: 8px; background: white; padding: 30px; box-shadow: var(--shadow); }
 .login-card h1 { font-size: 2.1rem; }
 .staff-login-shell { padding: clamp(32px, 7vh, 80px) 20px 48px; }
-.staff-login-card { width: min(480px, 100%); padding: clamp(24px, 5vw, 38px); border-top: 4px solid var(--turquoise); }
-.staff-login-card h1 { line-height: 1.15; margin-bottom: 16px; }
+.staff-login-card { width: min(480px, 100%); min-width: 0; overflow-wrap: anywhere; padding: clamp(24px, 5vw, 38px); border-top: 4px solid var(--turquoise); }
+.staff-login-card h1 { line-height: 1.15; margin-bottom: 16px; overflow-wrap: anywhere; }
 .auth-intro { color: var(--muted); font-size: .95rem; line-height: 1.65; margin-bottom: 24px; }
 .auth-email-summary { background: var(--soft); border: 1px solid var(--line); padding: 10px 12px; border-radius: 4px; overflow-wrap: anywhere; font-size: .86rem; }
 .auth-step label { font-size: .86rem; }

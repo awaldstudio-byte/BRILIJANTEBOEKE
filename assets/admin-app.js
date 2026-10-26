@@ -4,6 +4,7 @@ import { schoolOrderLink } from './school-links.js';
 import { initSchoolMaterials } from './school-materials.js';
 import { initReportDownloads } from './report-downloads.js';
 import { allowedBatchStatuses, shippingUpdateSummary } from './shipping-status.js';
+import { initRefundReconciliation, refundAction } from './refund-reconciliation.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -63,6 +64,8 @@ $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", mont
 const staffAccess = initStaffAccess({ language, onAuthenticated: async staff => { showAdmin(staff); await loadData(); } });
 $('#staff-enable-mfa').addEventListener('click', () => { if (!preview) staffAccess.startSetup(); });
 const academicYears = initAcademicYears({state,preview,api,tr,setView,escapeHtml});
+initRefundReconciliation({rows:$('#all-order-rows'),getOrders:()=>state.orders,getStaff:()=>state.staff,preview,api,language,
+  onRecorded:async()=>{await loadData();$('#order-filters').requestSubmit();}});
 init();
 
 async function init() {
@@ -175,7 +178,7 @@ function renderOfferingFields(selected) {
 }
 
 function renderOrders(orders) {
-  $("#all-order-rows").innerHTML = orders.map((order) => `<tr><td>${shortDate.format(new Date(order.created_at))}</td><td>${escapeHtml(order.reference)}</td><td>${escapeHtml(order.schools?.name)}</td><td>${(order.learners ?? []).map((learner) => `${escapeHtml(learner.first_name)} ${escapeHtml(learner.last_name)} (${escapeHtml(localGrade(learner.grades?.name))})`).join("<br>")}</td><td>${escapeHtml(order.parent_first_name)} ${escapeHtml(order.parent_last_name)}<br><span class="quiet-text">${escapeHtml(order.parent_email)}</span></td><td>${money.format(order.amount_cents / 100)}</td><td>${statusPill(order.status)}</td></tr>`).join("");
+  $("#all-order-rows").innerHTML = orders.map((order) => `<tr><td>${shortDate.format(new Date(order.created_at))}</td><td>${escapeHtml(order.reference)}</td><td>${escapeHtml(order.schools?.name)}</td><td>${(order.learners ?? []).map((learner) => `${escapeHtml(learner.first_name)} ${escapeHtml(learner.last_name)} (${escapeHtml(localGrade(learner.grades?.name))})`).join("<br>")}</td><td>${escapeHtml(order.parent_first_name)} ${escapeHtml(order.parent_last_name)}<br><span class="quiet-text">${escapeHtml(order.parent_email)}</span></td><td>${money.format(order.amount_cents / 100)}</td><td>${statusPill(order.status)}${refundAction(order,{language,administrator:state.staff?.role==='administrator',preview})}</td></tr>`).join("");
   $("#orders-empty").hidden = orders.length > 0;
 }
 

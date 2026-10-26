@@ -4,13 +4,17 @@ const logoContent = readFileSync(new URL('../../assets/images/logo.png', import.
 export const staffLogoCid = 'briljante-verification-logo@briljanteboeke.co.za';
 const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 
-export function staffVerificationContent(code, replyTo) {
+export function staffVerificationContent(code, replyTo, { recovery = false } = {}) {
   if (!/^\d{6,10}$/.test(code)) throw new Error('Invalid provider code.');
   if (typeof replyTo !== 'string' || !/^[A-Z0-9.!#$%&'*+\/=?^_`{|}~-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(replyTo)) throw new Error('Invalid support address.');
   const support = escapeHtml(replyTo);
+  const heading = recovery ? 'Recover your password' : 'Verify your email address';
+  const intro = recovery ? 'Use the code below to recover your Briljante Boeke administration password. Your existing authenticator will still be required if enabled.' : 'Use the code below to continue with your Briljante Boeke administration account.';
+  const introAf = recovery ? 'Gebruik die kode hieronder om u Briljante Boeke-administrasiewagwoord te herstel. U bestaande verifikasie-app sal steeds vereis word indien dit geaktiveer is.' : 'Gebruik die kode hieronder om met u Briljante Boeke-administrasierekening voort te gaan.';
   return {
     text: [
       'Briljante Boeke', 'Email verification / E-posverifikasie', '',
+      ...(recovery ? [intro, introAf, ''] : []),
       `Your verification code / U verifikasiekode: ${code}`, '',
       'Copy this code and enter it on the Briljante Boeke administration page where you requested it.',
       'Kopieer die kode en voer dit op die Briljante Boeke-administrasieblad in waar u dit aangevra het.', '',
@@ -31,9 +35,9 @@ export function staffVerificationContent(code, replyTo) {
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:600px;">
 <tr><td align="center" style="padding:0 0 28px;"><img class="email-logo" src="cid:${staffLogoCid}" width="144" height="103" alt="Briljante Boeke" style="display:block;width:144px;height:auto;border:0;color:#18385f;font-size:18px;"></td></tr>
 <tr><td class="email-card" bgcolor="#ffffff" style="padding:40px 44px;background-color:#ffffff;border-top:4px solid #31bfc4;">
-<h1 class="email-title" style="margin:0 0 22px;color:#18385f;font-size:28px;line-height:36px;font-weight:700;">Verify your email address</h1>
-<p style="margin:0 0 10px;color:#424f5e;font-size:16px;line-height:26px;">Use the code below to continue with your Briljante Boeke administration account.</p>
-<p lang="af" style="margin:0 0 28px;color:#596675;font-size:14px;line-height:23px;">Gebruik die kode hieronder om met u Briljante Boeke-administrasierekening voort te gaan.</p>
+<h1 class="email-title" style="margin:0 0 22px;color:#18385f;font-size:28px;line-height:36px;font-weight:700;">${heading}</h1>
+<p style="margin:0 0 10px;color:#424f5e;font-size:16px;line-height:26px;">${intro}</p>
+<p lang="af" style="margin:0 0 28px;color:#596675;font-size:14px;line-height:23px;">${introAf}</p>
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"><tr><td align="center" bgcolor="#edf5f7" style="padding:22px 12px;background-color:#edf5f7;border:1px solid #d8e8ec;">
 <p style="margin:0 0 10px;color:#465d70;font-size:11px;line-height:18px;font-weight:700;letter-spacing:1px;">VERIFICATION CODE / VERIFIKASIEKODE</p>
 <p class="email-code" dir="ltr" style="margin:0;color:#18385f;font-family:'Courier New',Courier,monospace;font-size:30px;line-height:40px;font-weight:700;letter-spacing:4px;white-space:nowrap;">${code}</p>

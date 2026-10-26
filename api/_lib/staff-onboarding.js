@@ -5,6 +5,7 @@ import { mailSettings, createMailTransport } from './order-mail.js';
 import { staffVerificationContent } from './staff-email.js';
 import { authCookies, opaqueToken, tokenHash, parseCookies, cookie, appendCookie,
   createStaffSession, attachProviderSession, setSessionCookies, hasStrongFactor, hasEnrolledFactor, authDenied } from './staff-session.js';
+import { clearSessionCookies } from './staff-session.js';
 
 export function normaliseStaffEmail(value) {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -43,9 +44,12 @@ export async function checkStaffEmail(database, email) {
 export async function limitStaffRequest(database, req, action, email = '') {
   const ip = String(req.headers['x-vercel-forwarded-for'] || req.socket?.remoteAddress || 'unknown').split(',')[0].trim();
   const hash = value => createHmac('sha256', env().orderTokenSecret).update(`staff-auth:${value}`).digest('hex');
-  const rules = [[`ip:${ip}`, 60, 900], [`${action}:ip:${ip}`, action === 'request-code' ? 10 : 20, 900]];
-  if (email) rules.push([`${action}:email:${email}`, action === 'request-code' ? 3 : 10, 900]);
-  if (action === 'request-code') rules.push(['outbound-code-global', 50, 3600]);
+  // Setup and recovery share one outbound quota; switching flows cannot double it.
+  const limitedAction = action === 'request-recovery' ? 'request-code' : action;
+  const sendsCode = limitedAction === 'request-code';
+  const rules = [[`ip:${ip}`, 60, 900], [`${limitedAction}:ip:${ip}`, sendsCode ? 10 : 20, 900]];
+  if (email) rules.push([`${limitedAction}:email:${email}`, sendsCode ? 3 : 10, 900]);
+  if (sendsCode) rules.push(['outbound-code-global', 50, 3600]);
   for (const [key, limit, seconds] of rules) {
     const result = await database.rpc('consume_staff_auth_limit', { p_key: hash(key), p_limit: limit, p_seconds: seconds });
     assertDatabaseResult(result.error);
@@ -53,11 +57,11 @@ export async function limitStaffRequest(database, req, action, email = '') {
   }
 }
 
-export function staffCodeMessage(email, code, settings) {
+export function staffCodeMessage(email, code, settings, { recovery = false } = {}) {
   if (!/^\d{6,10}$/.test(code)) throw new Error('Invalid provider code.');
   return { from: { name: 'Briljante Boeke', address: settings.from }, to: normaliseStaffEmail(email), replyTo: settings.replyTo,
-    subject: 'Briljante Boeke — account verification / rekeningverifikasie',
-    ...staffVerificationContent(code, settings.replyTo || 'info@briljanteboeke.co.za'),
+    subject: recovery ? 'Briljante Boeke — password recovery / wagwoordherstel' : 'Briljante Boeke — account verification / rekeningverifikasie',
+    ...staffVerificationContent(code, settings.replyTo || 'info@briljanteboeke.co.za', { recovery }),
     disableFileAccess: true, disableUrlAccess: true };
 }
 
@@ -67,7 +71,8 @@ export async function deliverStaffCode(database, approval, challengeHash, { sour
     if (source.AUTH_MAIL_ENABLED !== 'true') throw new Error('Authentication mail is disabled.');
     const current = await approvedEmail(database, approval.email);
     if (!current || current.id !== approval.id) throw new Error('Approval changed.');
-    const generated = await database.auth.admin.generateLink({ type: 'magiclink', email: approval.email });
+    const recovery = Boolean(current.auth_user_id && current.password_set_at);
+    const generated = await database.auth.admin.generateLink({ type: recovery ? 'recovery' : 'magiclink', email: approval.email });
     if (generated.error || !generated.data?.user || !/^\d{6,10}$/.test(generated.data?.properties?.email_otp || '')) throw new Error('Provider code generation failed.');
     const user = generated.data.user;
     if (user.email?.toLowerCase() !== approval.email || (approval.auth_user_id && approval.auth_user_id !== user.id)) throw new Error('Identity mismatch.');
@@ -78,7 +83,7 @@ export async function deliverStaffCode(database, approval, challengeHash, { sour
     assertDatabaseResult(staged.error);
     const settings = mailSettings({ ...source, MAIL_ENABLED: 'true' });
     transport = transportFactory(settings);
-    const result = await transport.sendMail(staffCodeMessage(approval.email, generated.data.properties.email_otp, settings));
+    const result = await transport.sendMail(staffCodeMessage(approval.email, generated.data.properties.email_otp, settings, { recovery }));
     if (!result.accepted?.some(value => String(value).toLowerCase() === approval.email)) throw new Error('Code not accepted.');
     const sent = await database.from('staff_setup_challenges').update({ status: 'sent' })
       .eq('token_hash', challengeHash).eq('status', 'queued');
@@ -102,6 +107,27 @@ export async function requestStaffCode(database, res, email, remember, schedule,
   return { next: 'code', message: 'If this address is approved, a verification code will be sent. Check your inbox and spam folder.' };
 }
 
+export async function requestStaffRecovery(database, res, email, remember, schedule, deliver = deliverStaffCode) {
+  if (process.env.AUTH_MAIL_ENABLED !== 'true') throw Object.assign(new Error('Account recovery is not available yet.'), { statusCode: 503 });
+  const secret = opaqueToken();
+  const hash = tokenHash(secret);
+  // Every address gets the same opaque cookie and response. Approval lookup and
+  // delivery happen after the request, with no signup or identity creation here.
+  appendCookie(res, cookie(authCookies.challenge, secret, { maxAge: 900 }));
+  schedule(Promise.resolve().then(async () => {
+    try {
+      const approval = await approvedEmail(database, email);
+      if (!approval?.auth_user_id || !approval.password_set_at) return;
+      const queued = await database.from('staff_setup_challenges').insert({
+        token_hash: hash, approval_id: approval.id, auth_user_id: approval.auth_user_id, remember: remember === true,
+      });
+      assertDatabaseResult(queued.error);
+      await deliver(database, approval, hash);
+    } catch { console.error('staff-auth: recovery request requires review'); }
+  }));
+  return { next: 'code', recovery: true, message: 'If this address has an approved account, a verification code will be sent. Check your inbox and spam folder.' };
+}
+
 export async function verifyStaffCode(database, auth, req, res, code) {
   const invalid = () => Object.assign(new Error('The code is invalid or expired. Request a new code if needed.'), { statusCode: 400 });
   if (typeof code !== 'string' || !/^\d{6,10}$/.test(code)) throw invalid();
@@ -111,52 +137,90 @@ export async function verifyStaffCode(database, auth, req, res, code) {
   const attempted = await database.rpc('consume_staff_setup_attempt', { p_hash: hash });
   assertDatabaseResult(attempted.error);
   const attempt = attempted.data?.[0];
-  if (!attempt?.approval_id || !attempt.auth_user_id) throw invalid();
+  if (!attempt?.approval_id || !attempt.auth_user_id) {
+    appendCookie(res, cookie(authCookies.challenge, '', { maxAge: 0 }));
+    throw invalid();
+  }
   const approved = await database.from('staff_access_approvals').select('*').eq('id', attempt.approval_id).eq('active', true).maybeSingle();
   assertDatabaseResult(approved.error);
   const approval = approved.data;
   if (!approval || approval.auth_user_id !== attempt.auth_user_id) throw invalid();
-  const result = await auth.auth.verifyOtp({ email: approval.email, token: code, type: 'email' });
+  const result = await auth.auth.verifyOtp({ email: approval.email, token: code, type: approval.password_set_at ? 'recovery' : 'email' });
   if (result.error || result.data.user?.id !== attempt.auth_user_id || !result.data.session ||
       result.data.user.email?.toLowerCase() !== approval.email || !result.data.user.email_confirmed_at) throw invalid();
-  const consumed = await database.from('staff_setup_challenges').update({ status: 'used' }).eq('token_hash', hash).eq('status', 'sent').select('token_hash').maybeSingle();
+  const consumed = await database.from('staff_setup_challenges').update({ status: 'used' }).eq('token_hash', hash).eq('status', 'sent')
+    .gt('expires_at', new Date().toISOString()).select('token_hash').maybeSingle();
   assertDatabaseResult(consumed.error);
   if (!consumed.data) throw invalid();
   await createStaffSession(database, res, result.data.session, approval, 'verified', attempt.remember);
   appendCookie(res, cookie(authCookies.challenge, '', { maxAge: 0 }));
-  return { next: 'new-password' };
+  return { next: approval.password_set_at ? 'recovery' : 'new-password', recovery: Boolean(approval.password_set_at) };
 }
 
 export async function setStaffPassword(context, res, password, confirmation) {
-  if (context.record.kind !== 'verified') throw authDenied();
+  if (context.record.kind !== 'verified' || context.record.revoked_at || !Number.isFinite(Date.parse(context.record.expires_at)) ||
+      Date.parse(context.record.expires_at) <= Date.now()) throw authDenied();
   validateNewStaffPassword(password, context.approval.email);
   if (password !== confirmation) throw Object.assign(new Error('The passwords do not match.'), { statusCode: 400 });
-  await attachProviderSession(context);
-  const changed = await context.auth.auth.updateUser({ password });
-  if (changed.error) throw Object.assign(new Error('The password could not be accepted. Use a different strong password or request a new verification code.'), { statusCode: 400 });
-  const updated = await context.database.from('staff_access_approvals').update({ password_set_at: new Date().toISOString() }).eq('id', context.approval.id).eq('active', true);
-  assertDatabaseResult(updated.error);
-  const staged = await context.database.from('staff_login_sessions').update({ kind: 'password' }).eq('token_hash', context.record.token_hash).is('revoked_at', null);
-  assertDatabaseResult(staged.error);
+  const checked = await freshPasswordContext(context);
+  if (hasEnrolledFactor(checked.user) && !await hasStrongFactor(checked)) {
+    throw Object.assign(new Error('Enter your existing authenticator code before changing your password. If you have lost access, contact technical support.'), { statusCode: 409 });
+  }
+  const approval = await approvedEmail(context.database, context.approval.email);
+  if (!approval || approval.id !== context.approval.id || approval.auth_user_id !== context.user.id) throw authDenied();
+  // Consume this mailbox-verified stage before any credential mutation. A raced
+  // or repeated request cannot reuse it, even if a later provider call fails.
+  const consumed = await context.database.from('staff_login_sessions').update({ revoked_at: new Date().toISOString() })
+    .eq('token_hash', context.record.token_hash).eq('kind', 'verified').is('revoked_at', null)
+    .gt('expires_at', new Date().toISOString()).select('token_hash').maybeSingle();
+  assertDatabaseResult(consumed.error);
+  if (!consumed.data) throw authDenied();
+  clearSessionCookies(res);
   const revoked = await context.database.from('staff_login_sessions').update({ revoked_at: new Date().toISOString() })
     .eq('auth_user_id', context.user.id).neq('token_hash', context.record.token_hash).is('revoked_at', null);
   assertDatabaseResult(revoked.error);
   const others = await context.auth.auth.signOut({ scope: 'others' });
   if (others.error) throw new Error('Provider session revocation failed.');
+  const changed = await context.auth.auth.updateUser({ password });
+  if (changed.error) throw Object.assign(new Error('The password could not be accepted. Request a new verification code and choose a different strong password.'), { statusCode: 400 });
+  const updated = await context.database.from('staff_access_approvals').update({ password_set_at: new Date().toISOString() })
+    .eq('id', approval.id).eq('active', true).eq('auth_user_id', context.user.id).select('id').maybeSingle();
+  assertDatabaseResult(updated.error);
+  if (!updated.data) throw authDenied();
   const session = await context.auth.auth.getSession();
-  if (!session.data.session) throw authDenied();
-  setSessionCookies(res, session.data.session, { ...context.record, kind: 'password' }, context.secret);
+  if (session.error || session.data.session?.user?.id !== context.user.id) throw authDenied();
+  await createStaffSession(context.database, res, session.data.session, approval, 'password', context.record.remember);
   return { next: 'mfa' };
 }
 
+async function freshPasswordContext(context) {
+  const session = await attachProviderSession(context);
+  const checked = await context.auth.auth.getUser(session.access_token);
+  if (checked.error || checked.data.user?.id !== context.user.id || checked.data.user.email?.toLowerCase() !== context.approval.email ||
+      !checked.data.user.email_confirmed_at) throw authDenied();
+  const listed = await context.auth.auth.mfa.listFactors();
+  if (listed.error || !Array.isArray(listed.data?.all)) throw new Error('Authenticator lookup failed.');
+  return { ...context, user: { ...checked.data.user, factors: listed.data.all }, accessToken: session.access_token, providerSession: session };
+}
+
 export async function staffMfaOptions(context, res) {
+  if (context.record.kind === 'verified') {
+    const checked = await freshPasswordContext(context);
+    const verified = checked.user.factors.find(factor => factor.status === 'verified');
+    if (!verified || await hasStrongFactor(checked)) return { next: 'new-password', recovery: Boolean(context.approval.password_set_at) };
+    if (verified.factor_type !== 'totp') throw Object.assign(new Error('Contact technical support to recover the verification method enabled on this account.'), { statusCode: 409 });
+    return { next: 'mfa-code', factor_id: verified.id, enrolling: false, can_skip: false, recovery: true };
+  }
   if (!context.approval.password_set_at || !['password', 'ready'].includes(context.record.kind)) throw authDenied();
-  await attachProviderSession(context);
+  const session = await attachProviderSession(context);
   const listed = await context.auth.auth.mfa.listFactors();
   if (listed.error || !Array.isArray(listed.data?.all)) throw new Error('Authenticator lookup failed.');
   const verified = listed.data.all.find(factor => factor.status === 'verified');
   if (verified) {
     if (verified.factor_type !== 'totp') throw Object.assign(new Error('Contact technical support to use the verification method enabled on this account.'), { statusCode: 409 });
+    if (context.record.kind === 'password' && await hasStrongFactor({ ...context, user: { ...context.user, factors: listed.data.all }, accessToken: session.access_token })) {
+      return completeStaffAccess(context, res, session);
+    }
     return { next: 'mfa-code', factor_id: verified.id, enrolling: false, can_skip: false };
   }
   // Once an approved user has deferred setup, ordinary password logins should
@@ -201,7 +265,7 @@ export async function beginStaffMfa(context) {
 }
 
 export async function finishStaffMfa(context, res, factorId, code) {
-  if (!context.approval.password_set_at || !['password', 'ready'].includes(context.record.kind) ||
+  if (!context.approval.password_set_at || !['verified', 'password', 'ready'].includes(context.record.kind) ||
       typeof code !== 'string' || !/^\d{6}$/.test(code) || !/^[a-f0-9-]{36}$/i.test(factorId || '')) throw authDenied();
   await attachProviderSession(context);
   const result = await context.auth.auth.mfa.challengeAndVerify({ factorId, code });
@@ -209,6 +273,10 @@ export async function finishStaffMfa(context, res, factorId, code) {
   const checked = await context.auth.auth.getUser(result.data.access_token);
   if (checked.error || checked.data.user?.id !== context.user.id) throw authDenied();
   if (!await hasStrongFactor({ ...context, accessToken: result.data.access_token, user: checked.data.user })) throw authDenied();
+  if (context.record.kind === 'verified') {
+    setSessionCookies(res, result.data, context.record, context.secret);
+    return { next: 'new-password', recovery: true };
+  }
   return completeStaffAccess({ ...context, user: checked.data.user }, res, result.data);
 }
 
