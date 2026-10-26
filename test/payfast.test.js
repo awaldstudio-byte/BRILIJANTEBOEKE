@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import { checkoutRequest, parameterString, phpUrlEncode, signature, verifyNotification } from "../api/_lib/payfast.js";
 import { requirePayFast } from "../api/_lib/env.js";
@@ -42,6 +43,7 @@ test("checkout fields never disclose the parent order access token", () => {
     },
   });
   assert.equal(result.action, "https://sandbox.payfast.co.za/eng/process");
+  assert.equal(result.fields.notify_url, "https://www.briljanteboeke.co.za/api/payfast-notify/");
   assert.equal(JSON.stringify(result).includes("must-not-leave-the-site"), false);
   assert.equal(result.fields.amount, "660.00");
 });
@@ -163,4 +165,54 @@ test("provider validation failure remains distinguishable as a retryable conditi
   const result = await verifyFixture({ fetchImpl: async () => { throw new Error("temporary outage"); } });
   assert.equal(result.valid, false);
   assert.deepEqual(result.reasons, ["server_confirmation_failed"]);
+});
+
+const providerFields = [
+  ["m_payment_id", "BB-26-ABC12345"], ["pf_payment_id", "1089250"],
+  ["payment_status", "COMPLETE"], ["amount_gross", "660.00"], ["merchant_id", "10000100"],
+];
+const providerBody = "m_payment_id=BB-26-ABC12345&pf_payment_id=1089250&payment_status=COMPLETE&amount_gross=660.00&merchant_id=10000100";
+
+for (const fixture of [
+  {
+    name: "empty optional fields and zero values",
+    entries: [...providerFields, ["custom_str1", ""], ["custom_int1", "0"]],
+    body: `${providerBody}&custom_str1=&custom_int1=0`,
+  },
+  {
+    name: "untrimmed values, Unicode and PHP encoding",
+    entries: [...providerFields, ["name_first", " Anné + /~ "], ["custom_str1", "  "]],
+    body: `${providerBody}&name_first=+Ann%C3%A9+%2B+%2F%7E+&custom_str1=++`,
+  },
+  {
+    name: "received field order rather than sorted or checkout order",
+    entries: [providerFields[4], ["custom_str1", ""], ...providerFields.slice(0, 4)],
+    body: "merchant_id=10000100&custom_str1=&m_payment_id=BB-26-ABC12345&pf_payment_id=1089250&payment_status=COMPLETE&amount_gross=660.00",
+  },
+]) {
+  test(`provider ITN retains ${fixture.name} for signature and server confirmation`, async () => {
+    // These expected parameter strings follow PayFast's ITN rules independently
+    // of the outbound checkout signature helper.
+    const providerSignature = createHash("md5").update(`${fixture.body}&passphrase=test-passphrase`).digest("hex");
+    const rawBody = Buffer.from(new URLSearchParams([...fixture.entries, ["signature", providerSignature]]).toString());
+    let submittedBody;
+    const result = await verifyFixture({
+      rawBody,
+      fetchImpl: async (url, options) => {
+        assert.equal(url, "https://sandbox.payfast.co.za/eng/query/validate");
+        submittedBody = options.body;
+        return { ok: true, text: async () => options.body === fixture.body ? "VALID" : "INVALID" };
+      },
+    });
+    assert.equal(submittedBody, fixture.body);
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.reasons, []);
+  });
+}
+
+test("checkout signing continues to trim values and omit empty fields", () => {
+  const entries = [["merchant_id", "10000100"], ["custom_str1", ""], ["name_first", " Parent "], ["custom_int1", "0"]];
+  const expected = "merchant_id=10000100&name_first=Parent&custom_int1=0&passphrase=test-passphrase";
+  assert.equal(parameterString(entries, { passphrase: "test-passphrase" }), expected);
+  assert.equal(signature(entries, "test-passphrase"), createHash("md5").update(expected).digest("hex"));
 });

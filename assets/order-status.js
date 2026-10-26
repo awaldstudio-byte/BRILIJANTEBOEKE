@@ -1,6 +1,7 @@
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const reference = (query.get("reference") ?? "").toUpperCase();
+const checkoutCancelled = query.get("cancelled") === "1";
 const money = new Intl.NumberFormat(language === "en" ? "en-ZA" : "af-ZA", { style: "currency", currency: "ZAR" });
 let orderToken = sessionStorage.getItem(`briljante_order_token_${reference}`) ?? "";
 const fragment = new URLSearchParams(location.hash.slice(1));
@@ -9,7 +10,7 @@ applyLanguage();
 if (!orderToken && fragment.get("token")) {
   orderToken = fragment.get("token");
   sessionStorage.setItem(`briljante_order_token_${reference}`, orderToken);
-  history.replaceState(null, "", `${location.pathname}?reference=${encodeURIComponent(reference)}&lang=${language}`);
+  history.replaceState(null, "", `${location.pathname}?reference=${encodeURIComponent(reference)}&lang=${language}${checkoutCancelled ? "&cancelled=1" : ""}`);
 }
 
 document.querySelector("#status-reference").textContent = reference;
@@ -39,15 +40,25 @@ function show(status, order = null) {
     const demo = order?.reference?.startsWith('DEMO-');
     title.textContent = demo ? tr('Demobestelling voltooi','Demo order complete') : tr("Betaling ontvang", "Payment received");
     copy.textContent = demo ? tr('Geen geld is gehef nie. Die bestelling verskyn slegs vir toetsing as betaal.','No money was charged. The order appears as paid for testing only.') : tr("Die betaling is geverifieer en die bestelling is by Briljante se betaalde leerderlys gevoeg.", "The payment has been verified and the order has been added to Briljante's paid learner list.");
+  } else if (status === "refunded") {
+    icon.textContent = "!";
+    title.textContent = tr("Betaling terugbetaal", "Payment refunded");
+    copy.textContent = tr("Hierdie bestelling is as terugbetaal gemerk. Kontak Briljante met die bestelverwysing indien u hulp benodig.", "This order is marked as refunded. Contact Briljante with the order reference if you need assistance.");
   } else if (["payment_failed", "cancelled"].includes(status)) {
     icon.textContent = "!";
     icon.classList.add("failed");
     title.textContent = status === "cancelled" ? tr("Betaling gekanselleer", "Payment cancelled") : tr("Betaling nie voltooi nie", "Payment not completed");
     copy.textContent = tr("Die bestelling is nie as betaal gemerk nie. Gebruik die private skoolskakel om die bestelling weer te probeer.", "The order was not marked as paid. Use the private school link to try the payment again.");
   } else if (status === "pending_payment") {
-    icon.textContent = "…";
-    title.textContent = tr("Betaling word nagegaan", "Checking payment");
-    copy.textContent = tr("PayFast se bevestiging kan ’n kort rukkie neem. Hierdie bladsy sal outomaties bywerk.", "PayFast confirmation may take a moment. This page will update automatically.");
+    if (checkoutCancelled) {
+      icon.textContent = "!";
+      title.textContent = tr("Betaling nie voltooi nie", "Payment not completed");
+      copy.textContent = tr("Die betaalproses is verlaat. Geen betaling is nog vir hierdie bestelling bevestig nie. Indien die betaling reeds voltooi is, sal hierdie bladsy bywerk sodra dit geverifieer is.", "Checkout was left before payment was confirmed. This order is still awaiting verified payment. If you already paid, this page will update when it is verified.");
+    } else {
+      icon.textContent = "…";
+      title.textContent = tr("Betaling word nagegaan", "Checking payment");
+      copy.textContent = tr("PayFast se bevestiging kan ’n kort rukkie neem. Hierdie bladsy sal outomaties bywerk.", "PayFast confirmation may take a moment. This page will update automatically.");
+    }
   } else {
     icon.textContent = "?";
     icon.classList.add("failed");

@@ -1,5 +1,7 @@
 # Briljante Boeke: PayFast preparation
 
+> Historical record from 20 October 2026. Later catalogue, reporting, staff-access and application work supersedes several statuses below. Use [the current Monray requirements review, 26 October 2026](PAYFAST_MONRAY_REVIEW_2026-10-26.md) for current evidence and remaining actions. The dated claims below are preserved as history.
+
 Prepared 20 October 2026. Internal working record; excluded from public deployment.
 
 ## Approved scope and business model

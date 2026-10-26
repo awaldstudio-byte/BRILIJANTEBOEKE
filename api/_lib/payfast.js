@@ -14,7 +14,11 @@ const liveSourceHosts = [
 ];
 
 export function phpUrlEncode(value) {
-  const bytes = Buffer.from(String(value).trim(), "utf8");
+  return encodePhp(String(value).trim());
+}
+
+function encodePhp(value) {
+  const bytes = Buffer.from(String(value), "utf8");
   let output = "";
   for (const byte of bytes) {
     const alphaNumeric =
@@ -64,7 +68,7 @@ export function checkoutRequest({
     ["merchant_key", merchantKey],
     ["return_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}&lang=${language}`],
     ["cancel_url", `${appOrigin}/order/status/?reference=${encodeURIComponent(order.reference)}&cancelled=1&lang=${language}`],
-    ["notify_url", `${appOrigin}/api/payfast-notify`],
+    ["notify_url", `${appOrigin}/api/payfast-notify/`],
     ["name_first", order.parentFirstName],
     ["name_last", order.parentLastName],
     ["email_address", order.parentEmail],
@@ -88,6 +92,15 @@ export function parseNotification(rawBody) {
   return { entries, data: Object.fromEntries(entries) };
 }
 
+function notificationParameterString(entries) {
+  // ITNs sign every posted value, including empty fields and surrounding spaces.
+  // Checkout requests use different rules: trim values and omit empty fields.
+  return entries
+    .filter(([key]) => key !== "signature")
+    .map(([key, value]) => `${key}=${encodePhp(value)}`)
+    .join("&");
+}
+
 export async function verifyNotification({
   rawBody,
   requestIp,
@@ -102,7 +115,11 @@ export async function verifyNotification({
   const { entries, data } = parseNotification(rawBody);
   const reasons = [];
 
-  const calculatedSignature = signature(entries, passphrase);
+  const confirmationBody = notificationParameterString(entries);
+  const signedBody = passphrase == null
+    ? confirmationBody
+    : `${confirmationBody}&passphrase=${encodePhp(passphrase)}`;
+  const calculatedSignature = createHash("md5").update(signedBody, "utf8").digest("hex");
   if (!data.signature || !safeEqual(data.signature.toLowerCase(), calculatedSignature)) {
     reasons.push("signature_mismatch");
   }
@@ -117,7 +134,6 @@ export async function verifyNotification({
   const sourceIsValid = await isPayFastSource(requestIp, mode, resolve4Impl, resolve6Impl);
   if (!sourceIsValid) reasons.push("source_ip_invalid");
 
-  const confirmationBody = parameterString(entries, { excludeSignature: true });
   let serverConfirmed = false;
   try {
     const response = await fetchImpl(`https://${PAYFAST_HOSTS[mode]}/eng/query/validate`, {
