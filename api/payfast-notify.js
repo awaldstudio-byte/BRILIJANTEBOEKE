@@ -52,7 +52,7 @@ export default async function handler(req, res) {
       p_payment_status: verification.data.payment_status || "",
       p_verification_state: verification.valid ? "verified" : "rejected",
       p_rejection_reason: verification.reasons.join(","),
-      p_raw_payload: verification.data,
+      p_raw_payload: { ...verification.data, _request_ip: forwardedIp(req.headers) },
       p_staff_recipients: settings.payfastMode === 'sandbox' ? [demoStaffEmail] : settings.notificationEmails,
     });
     assertDatabaseResult(processError);

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
-import { checkoutRequest, parameterString, phpUrlEncode, signature, verifyNotification } from "../api/_lib/payfast.js";
+import { checkoutRequest, parameterString, phpUrlEncode, signature, verifyNotification, isPublishedPayFastSource } from "../api/_lib/payfast.js";
 import { requirePayFast } from "../api/_lib/env.js";
 
 test("PayFast encoding matches PHP urlencode rules", () => {
@@ -145,6 +145,28 @@ test("live verification does not trust the sandbox notification address", async 
     mode: "live", resolve4Impl: async (host) => host === "sandbox.payfast.co.za" ? ["196.33.227.1"] : ["203.0.113.20"],
   });
   assert.ok(result.reasons.includes("source_ip_invalid"));
+});
+
+test('published PayFast CIDRs accept their boundaries and reject adjacent or malformed addresses', () => {
+  for (const ip of ['197.97.145.144','197.97.145.159','41.74.179.192','41.74.179.223',
+    '102.216.36.0','102.216.36.15','102.216.36.128','102.216.36.143','144.126.193.139','::ffff:144.126.193.139']) {
+    assert.equal(isPublishedPayFastSource(ip), true, ip);
+  }
+  for (const ip of ['197.97.145.143','197.97.145.160','41.74.179.191','41.74.179.224',
+    '102.216.36.16','102.216.36.127','102.216.36.144','144.126.193.138','144.126.193.140',
+    '197.97.145.144.evil','197.97.145.144, 203.0.113.1','197.097.145.144','999.97.145.144','127.0.0.1','',null]) {
+    assert.equal(isPublishedPayFastSource(ip), false, String(ip));
+  }
+});
+
+test('a published callback egress address works when web-host DNS has different addresses', async () => {
+  const overrides={requestIp:'144.126.193.139',resolve4Impl:async()=>['203.0.113.20'],resolve6Impl:async()=>[]};
+  assert.equal((await verifyFixture(overrides)).valid,true);
+  assert.equal((await verifyFixture({...overrides,merchantId:'wrong-merchant'})).valid,false);
+  assert.equal((await verifyFixture({...overrides,expectedAmountCents:1})).valid,false);
+  assert.equal((await verifyFixture({...overrides,fetchImpl:async()=>({ok:true,text:async()=> 'INVALID'})})).valid,false);
+  const forged=Buffer.from(notificationFixture().toString().replace('COMPLETE','FAILED'));
+  assert.equal((await verifyFixture({...overrides,rawBody:forged})).valid,false);
 });
 
 test("duplicate notification fields are rejected even when their signature matches", async () => {

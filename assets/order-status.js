@@ -5,6 +5,8 @@ const checkoutCancelled = query.get("cancelled") === "1";
 const money = new Intl.NumberFormat(language === "en" ? "en-ZA" : "af-ZA", { style: "currency", currency: "ZAR" });
 let orderToken = sessionStorage.getItem(`briljante_order_token_${reference}`) ?? "";
 const fragment = new URLSearchParams(location.hash.slice(1));
+let retrying = false;
+document.querySelector('#status-retry').addEventListener('click', retryPayment);
 
 applyLanguage();
 if (!orderToken && fragment.get("token")) {
@@ -30,6 +32,10 @@ async function checkStatus(attempt) {
 }
 
 function show(status, order = null) {
+  const retry = document.querySelector('#status-retry');
+  retry.hidden = !order || !orderToken || !['pending_payment','payment_failed'].includes(status);
+  retry.disabled = retrying;
+  retry.textContent = tr('Probeer betaling weer','Try payment again');
   const icon = document.querySelector("#status-icon");
   const title = document.querySelector("#status-title");
   const copy = document.querySelector("#status-copy");
@@ -70,6 +76,24 @@ function show(status, order = null) {
     document.querySelector("#status-school").textContent = order.school?.name ?? "";
     document.querySelector("#status-amount").textContent = money.format(order.amount_cents / 100);
   }
+}
+
+async function retryPayment() {
+  if (retrying || !orderToken || document.querySelector('#status-retry').hidden) return;
+  if (!confirm(tr('Kontroleer eers u betalingsgeskiedenis. Indien u reeds betaal het, kontak Briljante en moenie weer betaal nie. Gaan voort met dieselfde bestelling?', 'Check your payment history first. If you already paid, contact Briljante and do not pay again. Continue with this same order?'))) return;
+  retrying = true;
+  const button = document.querySelector('#status-retry');
+  const message = document.querySelector('#status-retry-message');
+  button.disabled = true; message.textContent = '';
+  try {
+    const response = await fetch('/api/create-checkout/', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference,order_token:orderToken,language})});
+    const checkout = await response.json();
+    if (!response.ok) { await checkStatus(12); throw new Error(checkout.error || tr('Betaling kon nie oopgemaak word nie.','Payment could not be opened.')); }
+    if (!['https://sandbox.payfast.co.za/eng/process','https://www.payfast.co.za/eng/process'].includes(checkout.action)) throw new Error(tr('Die betalingsadres kon nie geverifieer word nie.','The payment address could not be verified.'));
+    const form = document.createElement('form'); form.method='post'; form.action=checkout.action;
+    for (const [name,value] of Object.entries(checkout.fields || {})) { const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input); }
+    document.body.append(form); form.submit();
+  } catch (error) { message.textContent=error.message; retrying=false; button.disabled=false; }
 }
 
 function applyLanguage() {

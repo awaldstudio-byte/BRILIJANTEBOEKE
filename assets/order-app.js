@@ -49,6 +49,7 @@ const englishStatic = new Map([
   ["privaatheidsbeleid", "privacy policy"],
   ["gelees het, en dat ek die", "and accept the"],
   ["bestel-, aflewerings- en terugbetalingsbepalings", "order, delivery and returns terms"],
+  ["aanvaar.", "."],
   ["Terug", "Back"],
   ["Hersien bestelling", "Review order"],
   ["BESTELLING", "ORDER"],

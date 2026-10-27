@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { resolve4, resolve6 } from "node:dns/promises";
+import { BlockList, isIP } from "node:net";
 import { safeEqual } from "./crypto.js";
 
 export const PAYFAST_HOSTS = {
@@ -12,6 +13,32 @@ const liveSourceHosts = [
   "w1w.payfast.co.za",
   "w2w.payfast.co.za",
 ];
+
+// PayFast's published ITN infrastructure, reviewed 27 October 2026:
+// https://developers.payfast.co.za/docs#ports-ips
+// These ranges are shared infrastructure, not environment-specific credentials.
+// Mode-specific order checks, signatures, merchant/amount checks and server
+// confirmation against the selected sandbox/live endpoint remain mandatory.
+export const PAYFAST_SOURCE_CIDRS = Object.freeze([
+  '197.97.145.144/28', '41.74.179.192/27', '102.216.36.0/28',
+  '102.216.36.128/28', '144.126.193.139/32',
+]);
+const publishedSourceNetworks = new BlockList();
+for (const cidr of PAYFAST_SOURCE_CIDRS) {
+  const [network, prefix] = cidr.split('/');
+  publishedSourceNetworks.addSubnet(network, Number(prefix), 'ipv4');
+}
+function normalizedIp(value) {
+  if (typeof value !== 'string') return '';
+  const ip = value.trim().replace(/^::ffff:/i, '');
+  if (isIP(ip) === 4) return ip;
+  if (isIP(ip) !== 6) return '';
+  try { return new URL(`https://[${ip}]/`).hostname.slice(1, -1); } catch { return ''; }
+}
+export function isPublishedPayFastSource(value) {
+  const ip = normalizedIp(value);
+  return isIP(ip) === 4 && publishedSourceNetworks.check(ip, 'ipv4');
+}
 
 export function phpUrlEncode(value) {
   return encodePhp(String(value).trim());
@@ -168,7 +195,9 @@ export function forwardedIp(headers) {
 }
 
 async function isPayFastSource(requestIp, mode, resolve4Impl, resolve6Impl) {
-  if (!requestIp) return false;
+  const sourceIp = normalizedIp(requestIp);
+  if (!sourceIp || !['sandbox', 'live'].includes(mode)) return false;
+  if (isPublishedPayFastSource(sourceIp)) return true;
   const validIps = new Set();
   await Promise.all(
     (mode === "sandbox" ? ["sandbox.payfast.co.za"] : liveSourceHosts).map(async (host) => {
@@ -176,10 +205,13 @@ async function isPayFastSource(requestIp, mode, resolve4Impl, resolve6Impl) {
         resolve4Impl(host).catch(() => []),
         resolve6Impl(host).catch(() => []),
       ]);
-      for (const ip of [...ipv4, ...ipv6]) validIps.add(String(ip).replace(/^::ffff:/, ""));
+      for (const ip of [...ipv4, ...ipv6]) {
+        const normalized = normalizedIp(ip);
+        if (normalized) validIps.add(normalized);
+      }
     }),
   );
-  return validIps.has(String(requestIp).replace(/^::ffff:/, ""));
+  return validIps.has(sourceIp);
 }
 
 function decimalToCents(value) {
