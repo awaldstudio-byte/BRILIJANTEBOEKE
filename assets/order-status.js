@@ -50,11 +50,16 @@ function show(status, order = null) {
     icon.textContent = "!";
     title.textContent = tr("Betaling terugbetaal", "Payment refunded");
     copy.textContent = tr("Hierdie bestelling is as terugbetaal gemerk. Kontak Briljante met die bestelverwysing indien u hulp benodig.", "This order is marked as refunded. Contact Briljante with the order reference if you need assistance.");
-  } else if (["payment_failed", "cancelled"].includes(status)) {
+  } else if (status === "payment_failed") {
     icon.textContent = "!";
     icon.classList.add("failed");
-    title.textContent = status === "cancelled" ? tr("Betaling gekanselleer", "Payment cancelled") : tr("Betaling nie voltooi nie", "Payment not completed");
-    copy.textContent = tr("Die bestelling is nie as betaal gemerk nie. Gebruik die private skoolskakel om die bestelling weer te probeer.", "The order was not marked as paid. Use the private school link to try the payment again.");
+    title.textContent = tr("Betaling nie voltooi nie", "Payment not completed");
+    copy.textContent = tr("Die bestelling is nie as betaal gemerk nie. Kies Probeer betaling weer om met dieselfde bestelling voort te gaan. Indien u reeds betaal het, kontak Briljante met die bestelverwysing voordat u weer probeer.", "The order was not marked as paid. Select Try payment again to continue with this same order. If you already paid, contact Briljante with the order reference before trying again.");
+  } else if (status === "cancelled") {
+    icon.textContent = "!";
+    icon.classList.add("failed");
+    title.textContent = tr("Betaling gekanselleer", "Payment cancelled");
+    copy.textContent = tr("Hierdie bestelling is gekanselleer en kan nie weer hier betaal word nie. Kontak Briljante met die bestelverwysing indien u hulp benodig.", "This order is cancelled and cannot be paid again here. Contact Briljante with the order reference if you need assistance.");
   } else if (status === "pending_payment") {
     if (checkoutCancelled) {
       icon.textContent = "!";

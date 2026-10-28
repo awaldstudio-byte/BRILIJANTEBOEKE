@@ -91,6 +91,16 @@ test('retry is offered only for an authenticated payable order', async()=>{
     assert.equal(page.elements.get('#status-retry').hidden,!['pending_payment','payment_failed'].includes(status));
   }
 });
+test('failed-payment guidance reuses the order while cancelled orders direct users to support in both languages', async()=>{
+  for(const language of ['en','af']){
+    const failed=await statusPage({statuses:['payment_failed'],language});
+    const cancelled=await statusPage({statuses:['cancelled'],language});
+    assert.match(failed.elements.get('#status-copy').textContent,language==='en'?/Select Try payment again.*same order/:/Kies Probeer betaling weer.*dieselfde bestelling/);
+    assert.match(failed.elements.get('#status-copy').textContent,language==='en'?/If you already paid, contact Briljante/:/Indien u reeds betaal het, kontak Briljante/);
+    assert.match(cancelled.elements.get('#status-copy').textContent,language==='en'?/cannot be paid again here.*Contact Briljante/:/kan nie weer hier betaal word nie.*Kontak Briljante/);
+    for(const page of [failed,cancelled]) assert.doesNotMatch(page.elements.get('#status-copy').textContent,/private school link|private skoolskakel/);
+  }
+});
 test('retry reuses the saved private order and never creates another order or sends its token to PayFast',async()=>{
   const page=await statusPage(); await page.elements.get('#status-retry').click();
   assert.equal(page.requests.length,2); assert.equal(page.requests[1].url,'/api/create-checkout/');
