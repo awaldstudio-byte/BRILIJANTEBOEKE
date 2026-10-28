@@ -570,7 +570,9 @@ function localDateTime(value) {
 }
 
 async function api(url, options = {}) {
-  const response = await fetch(url, { credentials: "same-origin", headers: { "Content-Type": "application/json", ...(options.headers ?? {}) }, ...options });
+  // Match the deployed trailing-slash routes before sending a request body.
+  const requestUrl = url.replace(/^(\/api\/[^?#]*[^/?#])(?=[?#]|$)/, '$1/');
+  const response = await fetch(requestUrl, { credentials: "same-origin", headers: { "Content-Type": "application/json", ...(options.headers ?? {}) }, ...options });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(body.error || tr("Die versoek kon nie voltooi word nie.", "The request could not be completed."));
   return body;
