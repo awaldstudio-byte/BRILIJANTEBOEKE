@@ -1,5 +1,6 @@
 import { waitUntil } from '@vercel/functions';
 import { requireSameOrigin } from './_lib/auth.js';
+import { assertStaffEnvironmentConfiguration, assertStaffEnvironmentEmail } from './_lib/staff-environment.js';
 import { json, methodNotAllowed, publicError, readJson } from './_lib/http.js';
 import { serviceClient, publicAuthClient, assertDatabaseResult } from './_lib/supabase.js';
 import { clearSessionCookies, parseCookies, authCookies, tokenHash, loadStaffSession,
@@ -12,9 +13,20 @@ export function createStaffLoginHandler({ databaseFactory = serviceClient, authF
     if (!['POST', 'DELETE'].includes(req.method)) return methodNotAllowed(res, ['POST', 'DELETE']);
     try {
       requireSameOrigin(req);
+      assertStaffEnvironmentConfiguration();
       const database = databaseFactory();
       const auth = authFactory();
       if (req.method === 'DELETE') {
+        if (process.env.VERCEL_ENV === 'preview') {
+          // Clear an old disallowed preview login without revoking the shared
+          // production session. Only the permitted test identity can revoke here.
+          try { await loadStaffSession(req, res, { database, auth }); }
+          catch (error) {
+            if (![401, 403].includes(error.statusCode)) throw error;
+            clearSessionCookies(res);
+            return json(res, 200, { ok: true });
+          }
+        }
         const secret = parseCookies(req.headers.cookie || '')[authCookies.session] || '';
         if (/^[a-f0-9]{64}$/.test(secret)) {
           const revoked = await database.from('staff_login_sessions').update({ revoked_at: new Date().toISOString() }).eq('token_hash', tokenHash(secret));
@@ -30,6 +42,7 @@ export function createStaffLoginHandler({ databaseFactory = serviceClient, authF
         return json(res, 400, { error: 'Invalid account action.' });
       }
       const email = ['email-check', 'password', 'request-code', 'request-recovery'].includes(action) ? normaliseStaffEmail(body.email) : '';
+      if (email) assertStaffEnvironmentEmail(email);
       if (action !== 'status') await limitStaffRequest(database, req, action, email);
       if (action === 'email-check') return json(res, 200, await checkStaffEmail(database, email));
       if (action === 'request-code') return json(res, 200, await requestStaffCode(database, res, email, body.remember, schedule));

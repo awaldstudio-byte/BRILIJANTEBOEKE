@@ -6,6 +6,7 @@ import { staffVerificationContent } from './staff-email.js';
 import { authCookies, opaqueToken, tokenHash, parseCookies, cookie, appendCookie,
   createStaffSession, attachProviderSession, setSessionCookies, hasStrongFactor, hasEnrolledFactor, authDenied } from './staff-session.js';
 import { clearSessionCookies } from './staff-session.js';
+import { assertStaffEnvironmentConfiguration, assertStaffEnvironmentEmail } from './staff-environment.js';
 
 export function normaliseStaffEmail(value) {
   const email = typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -27,6 +28,7 @@ export function validateNewStaffPassword(password, email) {
 }
 
 export async function approvedEmail(database, email) {
+  assertStaffEnvironmentEmail(email);
   const result = await database.from('staff_access_approvals').select('*').eq('email', email).eq('active', true).maybeSingle();
   assertDatabaseResult(result.error);
   return result.data;
@@ -66,6 +68,9 @@ export function staffCodeMessage(email, code, settings, { recovery = false } = {
 }
 
 export async function deliverStaffCode(database, approval, challengeHash, { source = process.env, transportFactory = createMailTransport } = {}) {
+  // A queued job from an earlier preview must not generate codes or change a
+  // real staff account/challenge after preview access has been restricted.
+  try { assertStaffEnvironmentEmail(approval.email, source); } catch { console.error('staff-auth: preview code delivery denied'); return; }
   let transport;
   try {
     if (source.AUTH_MAIL_ENABLED !== 'true') throw new Error('Authentication mail is disabled.');
@@ -108,6 +113,7 @@ export async function requestStaffCode(database, res, email, remember, schedule,
 }
 
 export async function requestStaffRecovery(database, res, email, remember, schedule, deliver = deliverStaffCode) {
+  assertStaffEnvironmentEmail(email);
   if (process.env.AUTH_MAIL_ENABLED !== 'true') throw Object.assign(new Error('Account recovery is not available yet.'), { statusCode: 503 });
   const secret = opaqueToken();
   const hash = tokenHash(secret);
@@ -129,11 +135,23 @@ export async function requestStaffRecovery(database, res, email, remember, sched
 }
 
 export async function verifyStaffCode(database, auth, req, res, code) {
+  assertStaffEnvironmentConfiguration();
   const invalid = () => Object.assign(new Error('The code is invalid or expired. Request a new code if needed.'), { statusCode: 400 });
   if (typeof code !== 'string' || !/^\d{6,10}$/.test(code)) throw invalid();
   const secret = parseCookies(req.headers.cookie || '')[authCookies.challenge] || '';
   if (!/^[a-f0-9]{64}$/.test(secret)) throw invalid();
   const hash = tokenHash(secret);
+  if (process.env.VERCEL_ENV === 'preview') {
+    // Read the challenge owner before consuming an attempt or reaching the
+    // shared identity service. Cookies minted by older previews confer no bypass.
+    const pending = await database.from('staff_setup_challenges').select('approval_id').eq('token_hash', hash).maybeSingle();
+    assertDatabaseResult(pending.error);
+    if (!pending.data?.approval_id) throw invalid();
+    const owner = await database.from('staff_access_approvals').select('email').eq('id', pending.data.approval_id).eq('active', true).maybeSingle();
+    assertDatabaseResult(owner.error);
+    if (!owner.data) throw invalid();
+    assertStaffEnvironmentEmail(owner.data.email);
+  }
   const attempted = await database.rpc('consume_staff_setup_attempt', { p_hash: hash });
   assertDatabaseResult(attempted.error);
   const attempt = attempted.data?.[0];
@@ -145,6 +163,7 @@ export async function verifyStaffCode(database, auth, req, res, code) {
   assertDatabaseResult(approved.error);
   const approval = approved.data;
   if (!approval || approval.auth_user_id !== attempt.auth_user_id) throw invalid();
+  assertStaffEnvironmentEmail(approval.email);
   const result = await auth.auth.verifyOtp({ email: approval.email, token: code, type: approval.password_set_at ? 'recovery' : 'email' });
   if (result.error || result.data.user?.id !== attempt.auth_user_id || !result.data.session ||
       result.data.user.email?.toLowerCase() !== approval.email || !result.data.user.email_confirmed_at) throw invalid();

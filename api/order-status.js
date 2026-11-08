@@ -1,6 +1,7 @@
 import { sha256 } from "./_lib/crypto.js";
 import { json, methodNotAllowed, publicError } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
+import {refundBalance} from './_lib/refund-balances.js';
 
 export default async function handler(req, res) {
   if (req.method !== "GET") return methodNotAllowed(res, ["GET"]);
@@ -13,12 +14,13 @@ export default async function handler(req, res) {
     const database = serviceClient();
     const { data: order, error } = await database
       .from("orders")
-      .select("id, reference, amount_cents, status, paid_at, created_at, schools(name), ordering_periods(name, academic_years(year))")
+      .select("id, reference, amount_cents, status, paid_at, created_at, order_item_refunds(amount_cents), schools(name), ordering_periods(name, academic_years(year))")
       .eq("reference", reference)
       .eq("order_access_hash", sha256(token))
       .maybeSingle();
     assertDatabaseResult(error);
     if (!order) return json(res, 404, { error: "Order not found." });
+    const balance=refundBalance(order);
 
     const { data: learners, error: learnerError } = await database
       .from("learners")
@@ -30,6 +32,8 @@ export default async function handler(req, res) {
       order: {
         reference: order.reference,
         amount_cents: order.amount_cents,
+        refunded_cents: balance.refunded_cents,
+        remaining_paid_cents: balance.net_cents,
         status: order.status,
         paid_at: order.paid_at,
         created_at: order.created_at,

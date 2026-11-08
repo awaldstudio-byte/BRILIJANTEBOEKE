@@ -6,9 +6,11 @@ import { validateOrderInput } from "./_lib/validation.js";
 import { resolveSchoolOrdering, internalSchoolOrderHash } from './_lib/school-ordering.js';
 import { createDemoPaymentHandler } from './_lib/demo-payment-handler.js';
 import { createSandboxOrderHandler } from './_lib/sandbox-order-handler.js';
+import { protectPublicTraffic, protectOrderSubmission } from './_lib/order-abuse.js';
+import { demoSchoolId } from './_lib/demo-payment.js';
 
 export default createOrderHandler();
-export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), demoHandler = createDemoPaymentHandler(), sandboxHandler = createSandboxOrderHandler() } = {}) {
+export function createOrderHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), demoHandler = createDemoPaymentHandler(), sandboxHandler = createSandboxOrderHandler(), guardTraffic = protectPublicTraffic, guardSubmission = protectOrderSubmission, source = process.env } = {}) {
 return async function handler(req, res) {
   if (req.method !== "POST") return methodNotAllowed(res, ["POST"]);
 
@@ -19,13 +21,17 @@ return async function handler(req, res) {
     const input = validateOrderInput(body);
     const config = checkPayments(configuration());
     if (config.payfastMode === 'sandbox') throw Object.assign(new Error('Sandbox orders require the authorised technical test flow.'), { statusCode: 403 });
+    if (source.VERCEL_ENV !== 'production') throw Object.assign(new Error('Live ordering is available only on the production website.'), {statusCode:403});
     const orderToken = deriveOrderToken(input.idempotencyKey, config.orderTokenSecret);
     const database = databaseFactory();
-    let tokenHash = input.schoolToken ? sha256(input.schoolToken) : null;
-    if (input.schoolIdentifier) {
-      const { school, period } = await resolveSchoolOrdering(database, { identifier: input.schoolIdentifier, periodId: input.orderingPeriodId }, now());
-      tokenHash = await internalSchoolOrderHash(database, school, period, now());
-    }
+    await guardTraffic({req,res,database,settings:config});
+    await guardSubmission({req,res,database,settings:config,input});
+    // Resolve both legacy tokens and direct links before any order creation.
+    // Otherwise a valid old test-school token could bypass a slug-only guard.
+    const { school, period, open } = await resolveSchoolOrdering(database, { identifier: input.schoolIdentifier, periodId: input.orderingPeriodId, token: input.schoolToken }, now());
+    if (school.id === demoSchoolId) throw Object.assign(new Error('This school ordering link is unavailable.'), {statusCode:404});
+    if (!open) throw Object.assign(new Error('ORDERING_UNAVAILABLE'), {statusCode:400});
+    const tokenHash = input.schoolToken ? sha256(input.schoolToken) : await internalSchoolOrderHash(database, school, period, now());
     const { data, error } = await database.rpc("create_school_order", {
       p_token_hash: tokenHash,
       p_idempotency_key: input.idempotencyKey,
@@ -47,8 +53,8 @@ return async function handler(req, res) {
     const known = {
       ORDERING_UNAVAILABLE: "This school's ordering period is not currently open.",
       BOOK_NOT_AVAILABLE: "One of the selected books is no longer available for this school.",
-      CLASS_REQUIRED: "Enter the class for each learner.",
-      LEARNER_DETAILS_INVALID: "Check the learner details and try again.",
+      CLASS_REQUIRED: "This ordering period needs review. Please contact Briljante Boeke.",
+      LEARNER_DETAILS_INVALID: "Check the child details and try again.",
       PARENT_DETAILS_INVALID: "Check the parent details and try again.",
       CONSENT_REQUIRED: "Accept the terms and privacy policy before continuing.",
     };

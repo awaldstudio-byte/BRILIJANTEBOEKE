@@ -5,6 +5,8 @@ import { checkoutRequest } from './_lib/payfast.js';
 import { assertDatabaseResult, serviceClient } from './_lib/supabase.js';
 import { validateStatusInput } from './_lib/validation.js';
 import { requireSandboxAccess, assertPaymentEnvironment } from './_lib/sandbox-payment.js';
+import { protectPublicTraffic, protectCheckout } from './_lib/order-abuse.js';
+import { demoSchoolId } from './_lib/demo-payment.js';
 
 const preparationErrors = {
   CHECKOUT_ORDER_NOT_FOUND: [404, 'Order not found.'],
@@ -15,19 +17,31 @@ const preparationErrors = {
   CHECKOUT_LOCK_RETRY: [503, 'The payment record changed. Please check the order status and try again.'],
 };
 
+async function denyLiveTestSchool(database, reference, orderAccessHash) {
+  const result = await database.from('orders').select('id').eq('reference', reference)
+    .eq('order_access_hash', orderAccessHash).eq('school_id', demoSchoolId).maybeSingle();
+  assertDatabaseResult(result.error);
+  if (result.data) throw Object.assign(new Error('This order cannot be paid in this payment environment.'), { statusCode: 403 });
+}
+
 export function createCheckoutHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast,
-  sandboxAccess = requireSandboxAccess, checkEnvironment = assertPaymentEnvironment, buildRequest = checkoutRequest } = {}) {
+  sandboxAccess = requireSandboxAccess, checkEnvironment = assertPaymentEnvironment, buildRequest = checkoutRequest,
+  guardTraffic = protectPublicTraffic, guardCheckout = protectCheckout, checkLiveSchool = denyLiveTestSchool, source = process.env } = {}) {
   return async function handler(req, res) {
     if (req.method !== 'POST') return methodNotAllowed(res, ['POST']);
     try {
       const input = validateStatusInput(await readJson(req));
       const settings = checkPayments(configuration());
       if (settings.payfastMode === 'sandbox') await sandboxAccess(req, res);
+      else if (source.VERCEL_ENV !== 'production') throw Object.assign(new Error('Live ordering is available only on the production website.'), {statusCode:403});
       const database = databaseFactory();
+      if(settings.payfastMode==='live') await guardTraffic({req,res,database,settings});
+      const orderAccessHash = sha256(input.orderToken);
+      if(settings.payfastMode==='live') await checkLiveSchool(database, input.reference, orderAccessHash);
       // The RPC locks and rechecks the canonical order and attempt together.
       // Existing attempts are reused without resetting status or provider IDs.
       const prepared = await database.rpc('prepare_payfast_checkout', {
-        p_reference: input.reference, p_order_access_hash: sha256(input.orderToken), p_mode: settings.payfastMode,
+        p_reference: input.reference, p_order_access_hash: orderAccessHash, p_mode: settings.payfastMode,
       });
       if (prepared.error && preparationErrors[prepared.error.message]) {
         const [statusCode, message] = preparationErrors[prepared.error.message];
@@ -36,7 +50,12 @@ export function createCheckoutHandler({ databaseFactory = serviceClient, configu
       assertDatabaseResult(prepared.error);
       const order = prepared.data;
       if (!order) throw new Error('Checkout preparation returned no order.');
+      // Block old test-school orders from opening a live checkout. Incoming
+      // notifications still follow the normal reconciliation path.
+      if (settings.payfastMode === 'live' && order.school_id === demoSchoolId)
+        throw Object.assign(new Error('This order cannot be paid in this payment environment.'), { statusCode: 403 });
       checkEnvironment(order, settings.payfastMode);
+      if(settings.payfastMode==='live') await guardCheckout({req,res,database,settings,order});
       const request = buildRequest({ mode: settings.payfastMode, merchantId: settings.payfastMerchantId,
         merchantKey: settings.payfastMerchantKey, passphrase: settings.payfastPassphrase, appOrigin: settings.appOrigin,
         language: input.language, order: { reference: order.reference, amountCents: order.amount_cents,

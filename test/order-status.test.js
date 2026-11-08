@@ -5,7 +5,7 @@ import { runInNewContext } from "node:vm";
 
 const source = await readFile(new URL("../assets/order-status.js", import.meta.url), "utf8");
 
-async function statusPage({ statuses = ["pending_payment"], language = "en", cancelled = "1", token = true, fragment = "" } = {}) {
+async function statusPage({ statuses = ["pending_payment"], language = "en", cancelled = "1", token = true, fragment = "", orderFields = {} } = {}) {
   const elements = new Map();
   const timers = [];
   const requests = [];
@@ -33,12 +33,21 @@ async function statusPage({ statuses = ["pending_payment"], language = "en", can
       requests.push({ url, options });
       if(options.method==='POST') return {ok:true,json:async()=>({action:'https://sandbox.payfast.co.za/eng/process',fields:{m_payment_id:'BB-26-ABC12345',signature:'provider-signature'}})};
       const status = statuses[Math.min(requestIndex++, statuses.length - 1)];
-      return { ok: true, json: async () => ({ order: Object.freeze({ status, reference: "BB-26-ABC12345", amount_cents: 66000, school: { name: "Test School" } }) }) };
+      return { ok: true, json: async () => ({ order: Object.freeze({ status, reference: "BB-26-ABC12345", amount_cents: 66000, school: { name: "Test School" }, ...orderFields }) }) };
     },
   });
   await new Promise(setImmediate);
   return { elements, timers, requests, historyUrls, forms };
 }
+
+test('a partially refunded order states the refunded and remaining amounts without offering another payment', async()=>{
+  for(const language of ['en','af']){
+    const page=await statusPage({statuses:['paid'],language,orderFields:{refunded_cents:32000,remaining_paid_cents:34000}});
+    assert.equal(page.elements.get('#status-title').textContent,language==='en'?'Partial refund recorded':'Gedeeltelike terugbetaling aangeteken');
+    assert.match(page.elements.get('#status-copy').textContent,/320/);assert.match(page.elements.get('#status-copy').textContent,/340/);
+    assert.equal(page.elements.get('#status-retry').hidden,true);
+  }
+});
 
 test("cancel return explains unfinished checkout in both languages without changing the order", async () => {
   for (const language of ["en", "af"]) {

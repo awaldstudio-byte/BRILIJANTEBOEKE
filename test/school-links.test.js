@@ -7,6 +7,7 @@ import { createPublicSchoolHandler } from '../api/public-school.js';
 import { sha256 } from '../api/_lib/crypto.js';
 import orders, { createOrderHandler } from '../api/orders.js';
 import { resolveSchoolOrdering } from '../api/_lib/school-ordering.js';
+import { demoSchoolId } from '../api/_lib/demo-payment.js';
 import { createSchoolSaveHandler } from '../api/admin-schools.js';
 
 const token = 'ABCDE-23456';
@@ -33,7 +34,7 @@ function fixture({ schoolOverride = {}, periodOverride = {}, accessOverride = {}
 function response() { return { status(code) { this.code = code; return this; }, setHeader() {}, json(body) { this.body = body; return this; } }; }
 async function lookup(options = {}, query = { token, identifier: school.slug }, paymentReady = false) {
   const db = fixture(options), res = response();
-  await createPublicSchoolHandler({ databaseFactory: () => db, configuration: () => ({}), now: () => clock,
+  await createPublicSchoolHandler({ databaseFactory: () => db, configuration: () => ({}), now: () => clock, source:{VERCEL_ENV:'production'},
     checkPayments() { if (!paymentReady) throw Error('Not configured'); } })({ method: 'GET', query }, res);
   return { res, db };
 }
@@ -103,7 +104,7 @@ test('direct school order resolves the correct internal RPC hash and ignores inj
   const db=fixture(); let rpcCount=0,params;
   db.rpc=async(name,body)=>{rpcCount++; assert.equal(name,'create_school_order');params=body;
     return {data:{reused:false,reference:'BB-TEST',amount_cents:32000,status:'pending_payment'}};};
-  const handler=createOrderHandler({databaseFactory:()=>db,configuration:()=>({orderTokenSecret:'test-only-secret'}),checkPayments:config=>config,now:()=>clock});
+  const handler=createOrderHandler({source:{VERCEL_ENV:'production'},databaseFactory:()=>db,configuration:()=>({orderTokenSecret:'test-only-secret'}),checkPayments:config=>config,now:()=>clock,guardTraffic:async()=>{},guardSubmission:async()=>{}});
   const input={school_identifier:school.slug,ordering_period_id:period.id,token_hash:'injected',amount_cents:1,
     request_id:'550e8400-e29b-41d4-a716-446655440000',parent:{first_name:'Test',last_name:'Parent',email:'test@example.test',mobile:'0820000000'},
     consent:{accepted:true,policy_version:'2026-10-20'},learners:[{first_name:'Test',last_name:'Child',offering_id:'2de1d6a7-02b5-41e0-b9ee-b276c4d65041'}]};
@@ -119,6 +120,41 @@ test('direct school order resolves the correct internal RPC hash and ignores inj
 });
 test('legacy links are not required to supply an identifier', async () => {
   assert.equal((await lookup({}, { token })).res.code, 200);
+});
+test('live test school catalogue and order creation are denied for both link types', async () => {
+  for (const query of [{identifier:school.slug}, {token}]) {
+    const db=fixture();
+    db.tables.schools[0].id=demoSchoolId;
+    for (const table of ['ordering_periods','school_access','school_grade_offerings']) db.tables[table][0].school_id=demoSchoolId;
+    let mutations=0;
+    db.rpc=async()=>{ mutations++; throw new Error('Must not create an order'); };
+    const read=response();
+    await createPublicSchoolHandler({databaseFactory:()=>db,configuration:()=>({payfastMode:'live'}),checkPayments:x=>x,now:()=>clock,source:{VERCEL_ENV:'production'}})({method:'GET',query},read);
+    assert.equal(read.code,404);
+    assert.ok(!db.reads.includes('school_grade_offerings'));
+    const body={...(query.token?{school_token:token}:{school_identifier:school.slug,ordering_period_id:period.id}),
+      request_id:'550e8400-e29b-41d4-a716-446655440000',parent:{first_name:'Test',last_name:'Parent',email:'test@example.test',mobile:'0820000000'},
+      consent:{accepted:true,policy_version:'2026-10-20'},learners:[{first_name:'Test',last_name:'Child',offering_id:'2de1d6a7-02b5-41e0-b9ee-b276c4d65041'}]};
+    const res=response();
+    await createOrderHandler({source:{VERCEL_ENV:'production'},databaseFactory:()=>db,configuration:()=>({payfastMode:'live',orderTokenSecret:'test-only-secret'}),checkPayments:x=>x,now:()=>clock,guardTraffic:async()=>{},guardSubmission:async()=>{}})({method:'POST',body},res);
+    assert.equal(res.code,404); assert.equal(mutations,0);
+  }
+});
+test('preview with live credentials cannot advertise or create a live order',async()=>{
+  const db=fixture(), source={VERCEL_ENV:'preview'};
+  const read=response();await createPublicSchoolHandler({source,databaseFactory:()=>db,configuration:()=>({payfastMode:'live'}),checkPayments:x=>x,now:()=>clock})({method:'GET',query:{identifier:school.slug}},read);
+  assert.equal(read.code,200); assert.equal(read.body.payments_enabled,false);
+  let databases=0;const handler=createOrderHandler({source,configuration:()=>({payfastMode:'live'}),checkPayments:x=>x,databaseFactory(){databases++;}});
+  const body={school_identifier:school.slug,ordering_period_id:period.id,request_id:'550e8400-e29b-41d4-a716-446655440000',parent:{first_name:'Test',last_name:'Parent',email:'test@example.test',mobile:'0820000000'},consent:{accepted:true,policy_version:'2026-10-20'},learners:[{first_name:'Test',last_name:'Child',offering_id:'2de1d6a7-02b5-41e0-b9ee-b276c4d65041'}]};
+  const res=response();await handler({method:'POST',body},res);assert.equal(res.code,403);assert.equal(databases,0);
+});
+test('restricted preview can view the test school but cannot enable live payments',async()=>{
+  const db=fixture(); db.tables.schools[0].id=demoSchoolId;
+  for(const table of ['ordering_periods','school_access','school_grade_offerings']) db.tables[table][0].school_id=demoSchoolId;
+  const source={DEMO_PAYMENTS_ENABLED:'true',VERCEL_ENV:'preview',APP_ORIGIN:'https://briljante-preview-awaldstudio.vercel.app',SUPABASE_URL:'https://cigyxjfzbjlgbrduzcpw.supabase.co'};
+  const res=response();
+  await createPublicSchoolHandler({databaseFactory:()=>db,configuration:()=>({payfastMode:'live'}),checkPayments:x=>x,now:()=>clock,source})({method:'GET',query:{identifier:school.slug}},res);
+  assert.equal(res.code,200); assert.equal(res.body.payments_enabled,false);
 });
 test('payment readiness defaults closed; demo never enables real submission', () => {
   for (const config of [undefined, {}, { payments_enabled: false }, { payments_enabled: 'true' }]) assert.equal(paymentReadiness(config).enabled, false);

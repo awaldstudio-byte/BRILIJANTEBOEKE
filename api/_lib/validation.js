@@ -19,13 +19,13 @@ export function validateOrderInput(body) {
   const policyVersion = text(consent.policy_version, 8, 64, "The policy acknowledgement is invalid.");
 
   if (!Array.isArray(body.learners) || body.learners.length < 1 || body.learners.length > 10) {
-    throw badRequest("Add between one and ten learners.");
+    throw badRequest("Add between one and ten children.");
   }
 
   const learners = body.learners.map((learner) => ({
-    first_name: text(learner?.first_name, 2, 100, "Enter each learner's first name."),
-    last_name: text(learner?.last_name, 2, 100, "Enter each learner's surname."),
-    offering_id: uuid(learner?.offering_id, "Select an available grade for each learner."),
+    first_name: text(learner?.first_name, 2, 100, "Enter each child's first name."),
+    last_name: text(learner?.last_name, 2, 100, "Enter each child's surname."),
+    offering_id: uuid(learner?.offering_id, "Select an available grade for each child."),
   }));
 
   return {

@@ -4,9 +4,10 @@ import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { paidOrderColumns, paidOrderMessage } from './_lib/order-mail.js';
 import { readSchoolPaymentProgress } from './_lib/school-payment-progress.js';
 import { env } from './_lib/env.js';
-import { recordFullRefund } from './_lib/refund-reconciliation.js';
+import {recordFullRefund,refundInput} from './_lib/refund-reconciliation.js';
+import {demoEnvironment,demoStaffEmail,excludeDemoOrders,isDemoRecord} from './_lib/demo-payment.js';
 
-export function createAdminOrdersHandler({ authorize = requireStaff, checkOrigin = requireSameOrigin, databaseFactory = serviceClient, now = Date.now } = {}) {
+export function createAdminOrdersHandler({ authorize = requireStaff, checkOrigin = requireSameOrigin, databaseFactory = serviceClient, now = Date.now, source=process.env } = {}) {
 return async function handler(req, res) {
   if (!["GET", "POST"].includes(req.method)) return methodNotAllowed(res, ["GET", "POST"]);
   try {
@@ -14,7 +15,13 @@ return async function handler(req, res) {
     const { user } = await authorize(req, res, req.method === 'POST' ? ['administrator'] : ['administrator', 'viewer']);
     const database = databaseFactory();
     if (req.method === 'POST') {
-      const refund = await recordFullRefund(database, await readJson(req, 4000), user.id, now());
+      const body=await readJson(req,4000),input=refundInput(body,now());
+      const lookup=await database.from('orders').select('reference,school_id').eq('id',input.p_order_id).maybeSingle();
+      assertDatabaseResult(lookup.error);if(!lookup.data)throw Object.assign(new Error('Order not found.'),{statusCode:404});
+      if(isDemoRecord(lookup.data)) {
+        if(!demoEnvironment(source)||user.email?.toLowerCase()!==demoStaffEmail)throw Object.assign(new Error('Demo refunds require the dedicated technical test account.'),{statusCode:403});
+      } else if(source.VERCEL_ENV!=='production')throw Object.assign(new Error('Real parent records cannot be changed from this preview.'),{statusCode:403});
+      const refund = await recordFullRefund(database, body, user.id, now());
       return json(res, refund.reused ? 200 : 201, { refund, money_moved: false });
     }
     // Authenticated read-only rendering for checking a notification without
@@ -25,6 +32,7 @@ return async function handler(req, res) {
       const result=await database.from('orders').select(paidOrderColumns).eq('reference',reference).maybeSingle();
       assertDatabaseResult(result.error);
       if (!result.data) return json(res,404,{error:'Order not found.'});
+      if (!demoEnvironment(source) && isDemoRecord(result.data)) return json(res,404,{error:'Order not found.'});
       result.data.school_progress=await readSchoolPaymentProgress(database,result.data);
       const recipient='technical@awaldstudio.com';
       const message=paidOrderMessage({id:'00000000-0000-4000-8000-000000000001',kind:'staff_order_paid',recipient},result.data,
@@ -39,11 +47,14 @@ return async function handler(req, res) {
     let query = database
       .from("orders")
       .select(
-        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name)), payment_attempts(provider_payment_id,status), order_refunds(provider_refund_reference,refunded_at,amount_cents,recorded_at)",
+        "id, reference, amount_cents, status, parent_first_name, parent_last_name, parent_email, parent_mobile, created_at, paid_at, school_id, ordering_period_id, schools(name), ordering_periods(name, academic_years(year)), learners(first_name, last_name, grades(name)), payment_attempts(provider_payment_id,status), order_item_refunds(amount_cents), order_refunds(provider_refund_reference,refunded_at,amount_cents,recorded_at)",
         { count: "exact" },
       )
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1);
+
+    if (!demoEnvironment(source)) query=excludeDemoOrders(query);
 
     if (typeof req.query.status === "string" && req.query.status) query = query.eq("status", req.query.status);
     if (typeof req.query.school_id === "string" && req.query.school_id) query = query.eq("school_id", req.query.school_id);

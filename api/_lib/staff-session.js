@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { env } from './env.js';
 import { serviceClient, publicAuthClient, assertDatabaseResult } from './supabase.js';
+import { assertStaffEnvironmentConfiguration, assertStaffEnvironmentEmail } from './staff-environment.js';
 
 export const authCookies = { access: 'bb_admin_access', refresh: 'bb_admin_refresh', session: 'bb_admin_sid', challenge: 'bb_setup_challenge' };
 export const opaqueToken = () => randomBytes(32).toString('hex');
@@ -44,6 +45,7 @@ export function clearSessionCookies(res) {
 }
 
 export async function createStaffSession(database, res, providerSession, approval, kind, remember) {
+  assertStaffEnvironmentEmail(approval.email);
   const secret = opaqueToken();
   const record = { token_hash: tokenHash(secret), approval_id: approval.id, auth_user_id: providerSession.user.id,
     kind, remember: remember === true, expires_at: new Date(Date.now() + 15 * 60_000).toISOString() };
@@ -54,6 +56,7 @@ export async function createStaffSession(database, res, providerSession, approva
 }
 
 export async function loadStaffSession(req, res, { database = serviceClient(), auth = publicAuthClient() } = {}) {
+  assertStaffEnvironmentConfiguration();
   const cookies = parseCookies(req.headers.cookie || '');
   const secret = cookies[authCookies.session] || '';
   if (!/^[a-f0-9]{64}$/.test(secret)) throw authDenied();
@@ -68,6 +71,7 @@ export async function loadStaffSession(req, res, { database = serviceClient(), a
   assertDatabaseResult(approvalResult.error);
   const approval = approvalResult.data;
   if (!approval || approval.auth_user_id !== record.auth_user_id) throw authDenied();
+  try { assertStaffEnvironmentEmail(approval.email); } catch (error) { clearSessionCookies(res); throw error; }
   let access = cookies[authCookies.access];
   let refresh = cookies[authCookies.refresh];
   let user = null;
@@ -89,6 +93,7 @@ export async function loadStaffSession(req, res, { database = serviceClient(), a
 }
 
 export async function attachProviderSession(context) {
+  assertStaffEnvironmentEmail(context.approval.email);
   const result = await context.auth.auth.setSession({ access_token: context.accessToken, refresh_token: context.refreshToken });
   if (result.error || result.data.user?.id !== context.user.id || !result.data.session) throw authDenied();
   return result.data.session;
@@ -108,6 +113,7 @@ export function hasEnrolledFactor(user) {
 }
 
 export async function authorisedStaff(context, roles = ['administrator', 'viewer']) {
+  assertStaffEnvironmentEmail(context.approval.email);
   if (context.record.kind !== 'ready' || !context.approval.password_set_at || !context.approval.setup_completed_at) throw authDenied();
   const enrolled = hasEnrolledFactor(context.user);
   if (enrolled && !await hasStrongFactor(context)) throw authDenied();

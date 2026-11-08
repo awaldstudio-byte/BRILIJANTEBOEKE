@@ -23,6 +23,7 @@ test("order input accepts multiple learners and rejects malformed offerings", ()
     ],
   });
   assert.equal(input.learners.length, 2);
+  assert.ok(input.learners.every(learner => !('class_name' in learner)), 'class data is excluded as requested by the client');
   assert.throws(() => validateOrderInput({
     school_token: input.schoolToken,
     request_id: input.idempotencyKey,

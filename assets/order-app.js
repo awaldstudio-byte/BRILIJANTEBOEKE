@@ -4,7 +4,7 @@ const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const { token: schoolToken, identifier: schoolIdentifier, periodId } = schoolAccess(location.search);
 const preview = query.get("preview") === "1";
-const policyVersion = "2026-10-20";
+const policyVersion = "2026-11-05";
 const locale = language === "en" ? "en-ZA" : "af-ZA";
 const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR" });
 const date = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" });
@@ -100,7 +100,7 @@ function renderBase() {
     const notice = document.createElement('p');
     notice.className = 'notice-card payment-unavailable';
     notice.setAttribute('role','status');
-    notice.textContent = tr('PAYFAST-TOETS: gebruik slegs fiktiewe leerderbesonderhede en die goedgekeurde toetsposbus. Geen regte geld word gehef nie.', 'PAYFAST SANDBOX: use fictional learner details and the approved test mailbox only. No real money is charged.');
+    notice.textContent = tr('PAYFAST-TOETS: gebruik slegs fiktiewe kinderbesonderhede en die goedgekeurde toetsposbus. Geen regte geld word gehef nie.', 'PAYFAST SANDBOX: use fictional child details and the approved test mailbox only. No real money is charged.');
     $('.order-intro').after(notice);
     $('#pay-button').textContent = tr('Toets PayFast', 'Test PayFast sandbox');
     $('#payment-verification-note').textContent = tr('PayFast se toetsomgewing word gebruik. Slegs ’n geverifieerde toetskennisgewing kan hierdie bestelling as betaal merk.', 'PayFast sandbox will open. Only a verified sandbox payment notification can mark this test order as paid.');

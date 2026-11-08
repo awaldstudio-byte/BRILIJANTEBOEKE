@@ -1,3 +1,4 @@
+import {isRefundedItem} from './refund-balances.js';
 const invalid = () => Object.assign(new Error('School progress could not be calculated.'), {code:'PROGRESS_LOOKUP_FAILED'});
 function integer(value) { if (!Number.isSafeInteger(value) || value < 0) throw invalid(); return value; }
 
@@ -15,6 +16,7 @@ export function calculateSchoolProgress(offerings, items, capturedAt = new Date(
     grade.expected_value_cents += integer(row.expected_quantity) * integer(row.price_cents);
   }
   for (const row of items) {
+    if(isRefundedItem(row)) continue;
     const offering = byOffering.get(row.offering_id);
     const grade = getGrade(offering?.grade_id || row.learners?.grade_id,offering?.grades?.name || row.learners?.grades?.name,offering?.grades?.sort_order || row.learners?.grades?.sort_order);
     grade.paid += integer(row.quantity);
@@ -45,7 +47,7 @@ export async function readSchoolPaymentProgress(database,order,{now=()=>new Date
     allRows(()=>database.from('school_grade_offerings').select('id,grade_id,price_cents,expected_quantity,active,grades(name,sort_order)')
       .eq('school_id',order.school_id).eq('ordering_period_id',order.ordering_period_id).order('id')),
     allRows(()=>{
-      let query=database.from('order_items').select('id,offering_id,quantity,line_total_cents,learners(grade_id,grades(name,sort_order)),orders!inner(reference,school_id,ordering_period_id,status)')
+      let query=database.from('order_items').select('id,offering_id,quantity,line_total_cents,order_item_refunds(id),learners(grade_id,grades(name,sort_order)),orders!inner(reference,school_id,ordering_period_id,status)')
         .eq('orders.school_id',order.school_id).eq('orders.ordering_period_id',order.ordering_period_id).eq('orders.status','paid').order('id');
       return demo ? query.like('orders.reference','DEMO-%') : query.not('orders.reference','like','DEMO-%');
     }),

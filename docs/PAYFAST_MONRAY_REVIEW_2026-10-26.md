@@ -1,6 +1,8 @@
 # Briljante Boeke: PayFast requirements review
 
-Reviewed 26 October 2026. Internal audit, excluded from public deployment. This is the current reconciliation; the [20 October record](PAYFAST_READINESS.md) is historical. Implementation, provider acceptance and production activation are separate states.
+Reviewed 26 October 2026. Internal audit, excluded from public deployment. The tables below preserve that dated snapshot; the [27-28 October provider acceptance continuation](PROVIDER_ACCEPTANCE_2026-10-27.md) contains current preview, genuine sandbox, mail, reporting, backup and outstanding-launch evidence. The [20 October record](PAYFAST_READINESS.md) is also historical. Implementation, provider acceptance and production activation are separate states.
+
+28 October correspondence update: Lindie reported at 07:00 South African time that FICA documents had been uploaded. Monray asked at 08:39 which email address was registered. This establishes a client-reported submission and an outstanding provider question; it does not establish FICA approval, enabled methods or settlement readiness. No follow-up was sent by this task. See the continuation record for the verified sandbox receipt and remaining actions.
 
 ## Source and current environment
 

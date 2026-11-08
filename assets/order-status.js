@@ -44,8 +44,15 @@ function show(status, order = null) {
     icon.textContent = "✓";
     icon.classList.add("paid");
     const demo = order?.reference?.startsWith('DEMO-');
-    title.textContent = demo ? tr('Demobestelling voltooi','Demo order complete') : tr("Betaling ontvang", "Payment received");
-    copy.textContent = demo ? tr('Geen geld is gehef nie. Die bestelling verskyn slegs vir toetsing as betaal.','No money was charged. The order appears as paid for testing only.') : tr("Die betaling is geverifieer en die bestelling is by Briljante se betaalde leerderlys gevoeg.", "The payment has been verified and the order has been added to Briljante's paid learner list.");
+    if (Number.isSafeInteger(order?.refunded_cents) && order.refunded_cents > 0) {
+      title.textContent = tr('Gedeeltelike terugbetaling aangeteken','Partial refund recorded');
+      copy.textContent = demo
+        ? tr(`Toets slegs: ${money.format(order.refunded_cents/100)} is as terugbetaal aangeteken. Geen geld is gehef of terugbetaal nie.`,`Test only: ${money.format(order.refunded_cents/100)} is recorded as refunded. No money was charged or returned.`)
+        : tr(`${money.format(order.refunded_cents/100)} is as terugbetaal aangeteken. Die oorblywende betaalde bedrag is ${money.format(order.remaining_paid_cents/100)}. Kontak Briljante met die bestelverwysing vir navrae.`,`${money.format(order.refunded_cents/100)} is recorded as refunded. The remaining paid amount is ${money.format(order.remaining_paid_cents/100)}. Contact Briljante with the order reference for help.`);
+    } else {
+      title.textContent = demo ? tr('Demobestelling voltooi','Demo order complete') : tr("Betaling ontvang", "Payment received");
+      copy.textContent = demo ? tr('Geen geld is gehef nie. Die bestelling verskyn slegs vir toetsing as betaal.','No money was charged. The order appears as paid for testing only.') : tr("Die betaling is geverifieer en die bestelling is by Briljante se lys van betaalde bestellings gevoeg.", "The payment has been verified and the order has been added to Briljante's list of paid orders.");
+    }
   } else if (status === "refunded") {
     icon.textContent = "!";
     title.textContent = tr("Betaling terugbetaal", "Payment refunded");

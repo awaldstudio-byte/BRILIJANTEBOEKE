@@ -3,6 +3,8 @@ import { requireStaff, requireSameOrigin } from './auth.js';
 export const demoSchoolId = 'edabcd03-1854-43ca-ac93-45c71e9ef012';
 export const demoStaffEmail = 'technical@awaldstudio.com';
 export const demoOrigin = 'https://briljante-preview-awaldstudio.vercel.app';
+export const isDemoRecord = record => record?.school_id === demoSchoolId || String(record?.reference || '').startsWith('DEMO-');
+export const excludeDemoOrders = (query, prefix='') => query.not(`${prefix}reference`,'like','DEMO-%').neq(`${prefix}school_id`,demoSchoolId);
 export function demoEnvironment(source = process.env) {
   return source.DEMO_PAYMENTS_ENABLED === 'true' && source.VERCEL_ENV === 'preview' &&
     source.APP_ORIGIN === demoOrigin && source.SUPABASE_URL === 'https://cigyxjfzbjlgbrduzcpw.supabase.co';

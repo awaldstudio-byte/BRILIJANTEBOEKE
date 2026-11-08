@@ -2,6 +2,8 @@
 
 Verified 26 October 2026, 17:04 South African time. This record proves a synthetic PostgreSQL logical restore. It does not prove a current hosted-client backup, Supabase service restoration, Storage-file recovery or provider retention.
 
+28 October hosted follow-up: the authenticated dedicated-project **Database Backups → Scheduled backups** screen explicitly states **Free Plan does not include project backups**. It offers a Pro upgrade for up to seven days of scheduled backups. No upgrade, paid service or recurring backup job was enabled. Screenshot: task `outputs/payfast-acceptance-2026-10-28/hosted-backup-coverage.png`. The current hosted-data backup and independent key/Storage recovery remain outstanding; the synthetic rehearsal below does not cover them.
+
 ## Implemented tools
 
 - `scripts/backup-db.mjs` streams a PostgreSQL custom-format dump directly into AES-256-GCM encryption. No plaintext dump is written. A separately supplied 32-byte random key is read from `BRILJANTE_BACKUP_KEY`, never printed or passed in arguments. The encrypted archive and checksum manifest must be outside the repository; the output directory is restricted to the current user on Windows.
@@ -55,7 +57,7 @@ The dump covers database objects/data only. It excludes cluster-global role/pass
 
 | Item | State / next action | Owner |
 | --- | --- | --- |
-| Hosted provider plan, backup status and retention | Root dashboard inspection pending; do not infer backup entitlement from this rehearsal. | Studio / Briljante |
+| Hosted provider plan, backup status and retention | Verified 28 October: current Free plan has no included project backups. Provider retention is therefore unavailable on this plan; no paid upgrade performed. | Studio / Briljante |
 | Current client-data logical backup | Access pending existing secure DB credentials; no password reset authorised by this runbook. | Studio / account owner |
 | Storage originals/file-byte recovery | Not checked; securely copy actual approved objects and verify retrieval separately. | Studio / Briljante |
 | Off-device encrypted copy and key recovery | Not checked; choose approved destination and verify a recoverable independent key. | Briljante / Studio |

@@ -70,22 +70,19 @@ Start with `PAYFAST_MODE=sandbox`. Live mode must only be enabled after the comp
 
 The current readiness record is `docs/PAYFAST_READINESS.md`. Without complete payment configuration the live school interface stays closed and the order API refuses to create orders. `PAYFAST_MODE=live` additionally requires `PAYFAST_LIVE_ENABLED=true` and non-sandbox merchant credentials. Public homepage/policy publication does not activate the school-ordering application.
 
-## Database setup
+## Database setup and staff approval
 
-1. Create the dedicated Supabase project in the approved organisation and region.
-2. Apply every migration in `supabase/migrations/` in timestamp order.
-3. Run Supabase security and performance advisors and resolve material findings.
-4. Create the first Briljante staff user in Supabase Auth.
-5. Link that Auth user to the staff allow-list:
+The dedicated project is already provisioned. Verify its project reference before applying any migration; do not create or switch projects as a routine release step.
 
-```sql
-insert into public.staff_users (user_id, display_name, role)
-select id, 'Briljante', 'administrator'
-from auth.users
-where lower(email) = lower('approved-staff-email@example.com');
-```
+1. Apply pending migrations from `supabase/migrations/` in timestamp order after the required backup and acceptance checks.
+2. Run the relevant database security and permissions checks.
+3. Add only an explicitly approved staff email to the private `public.staff_access_approvals` directory, with the approved role and display name. Do not put an administrator-selected password in SQL or create a user with a shared password.
+4. The approved staff member uses the account setup flow, proves control of that mailbox with the expiring provider code, and privately chooses a password. Supabase Auth manages the identity; the application verifies its linkage to the approval before granting staff access.
+5. Follow the password and authenticator stages on the staff interface. An enrolled authenticator remains compulsory at login; an approved user with no enrolled factor can choose to set one up later.
 
-Replace the example address with the approved staff address. Staff access is not granted from user metadata.
+`staff_access_approvals` is authoritative. Do not activate the legacy `staff_users` directory: current application access deliberately ignores it, and older immutable previews may still consult it without the current controls. Staff permission never comes from user-editable metadata.
+
+The restricted preview permits only the dedicated technical test identity on its configured project and origin. Real staff use the production administration route. See `docs/STAFF_ACCESS_PREVIEW_2026-10-22.md`, `docs/STAFF_RECOVERY_2026-10-26.md` and the latest release status for environment-specific acceptance.
 
 ## First school information
 
@@ -96,7 +93,6 @@ The Briljante administration page requires only the confirmed operational inform
 - Ordering-period opening and closing dates
 - Participating grades
 - Price and expected quantity per participating grade
-- Whether class is required
 - Optional delivery note
 
 Saving a new setup generates a private parent access code and order link. Briljante can copy either value or open a prepared email addressed to the school contact. Generating a replacement code revokes the previous active code.

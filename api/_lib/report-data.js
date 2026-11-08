@@ -1,5 +1,7 @@
 import { assertDatabaseResult } from './supabase.js';
 import { readSchoolLogo } from './school-materials.js';
+import {refundBalance,isRefundedItem} from './refund-balances.js';
+import {demoEnvironment,demoSchoolId,excludeDemoOrders} from './demo-payment.js';
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (message, statusCode = 400) => Object.assign(new Error(message), { statusCode });
@@ -37,11 +39,12 @@ async function single(query, message) {
   if (!data) throw fail(message, 404);
   return data;
 }
-export async function loadReport(database, options, { now = () => new Date().toISOString(), logoReader = readSchoolLogo } = {}) {
+export async function loadReport(database, options, { now = () => new Date().toISOString(), logoReader = readSchoolLogo, demoMode = demoEnvironment() } = {}) {
   const capturedAt = now();
   let school = null, period = null, batch = null;
   if (options.report === 'batch') {
     batch = await single(database.from('fulfilment_batches').select('id,label,status,created_at,school_id,ordering_period_id').eq('id', options.batch_id), 'The batch was not found.');
+    if (!demoMode && batch.school_id===demoSchoolId) throw fail('The batch was not found.',404);
     if ((options.school_id && options.school_id !== batch.school_id) || (options.period_id && options.period_id !== batch.ordering_period_id)) throw fail('The batch does not match the selected school or period.');
     options = { ...options, school_id: batch.school_id, period_id: batch.ordering_period_id };
   }
@@ -54,16 +57,18 @@ export async function loadReport(database, options, { now = () => new Date().toI
   let rows, orders = [];
   if (batch) {
     rows = await readReportRows(() => database.from('fulfilment_batch_items').select('id,book_title,learner_first_name,learner_last_name,order_reference,quantity,grades(name)').eq('batch_id', batch.id));
+    if (!demoMode && rows.some(row=>row.order_reference?.startsWith('DEMO-'))) throw fail('The batch was not found.',404);
     rows = rows.map(row => ({ school: school.name, year: period.academic_years?.year, period: period.name, grade: row.grades?.name || '', learner: `${row.learner_first_name} ${row.learner_last_name}`, surname: row.learner_last_name, book: row.book_title, reference: row.order_reference, quantity: row.quantity }));
   } else {
     const filter = (query, prefix = '') => {
       query = query.eq(`${prefix}status`, 'paid').lte(`${prefix}paid_at`, capturedAt);
+      if (!demoMode) query=excludeDemoOrders(query,prefix);
       if (options.school_id) query = query.eq(`${prefix}school_id`, options.school_id);
       if (options.period_id) query = query.eq(`${prefix}ordering_period_id`, options.period_id);
       return query;
     };
-    orders = await readReportRows(() => filter(database.from('orders').select('id,reference,school_id,ordering_period_id,parent_first_name,parent_last_name,parent_email,parent_mobile,amount_cents,paid_at,schools(name),ordering_periods(name,academic_years(year))')));
-    const items = await readReportRows(() => filter(database.from('order_items').select('id,order_id,description_snapshot,quantity,line_total_cents,learners!inner(first_name,last_name,class_name,grades(name)),orders!inner(status,paid_at,school_id,ordering_period_id)'), 'orders.'));
+    orders = await readReportRows(() => filter(database.from('orders').select('id,reference,school_id,ordering_period_id,parent_first_name,parent_last_name,parent_email,parent_mobile,amount_cents,order_item_refunds(amount_cents),paid_at,schools(name),ordering_periods(name,academic_years(year))')));
+    const items = (await readReportRows(() => filter(database.from('order_items').select('id,order_id,description_snapshot,quantity,line_total_cents,order_item_refunds(id),learners!inner(first_name,last_name,class_name,grades(name)),orders!inner(reference,status,paid_at,school_id,ordering_period_id)'), 'orders.'))).filter(item=>!isRefundedItem(item));
     const byOrder = new Map(orders.map(order => [order.id, order]));
     rows = items.map(item => {
       const order = byOrder.get(item.order_id);
@@ -73,7 +78,7 @@ export async function loadReport(database, options, { now = () => new Date().toI
     // Detect a concurrent status change instead of emitting a partial register with conflicting totals.
     const totals = new Map();
     for (const item of items) totals.set(item.order_id, (totals.get(item.order_id) || 0) + item.line_total_cents);
-    if (orders.some(order => totals.get(order.id) !== order.amount_cents)) throw fail('Payment records changed or could not be reconciled. Please download the report again.', 409);
+    if (orders.some(order => totals.get(order.id) !== refundBalance(order).net_cents)) throw fail('Payment records changed or could not be reconciled. Please download the report again.', 409);
   }
   const report = buildReport({ ...options, school, period, batch, rows, orders, capturedAt });
   report.schoolLogo = school ? await logoReader(database, school.id) : null;
@@ -99,12 +104,19 @@ export function buildReport({ language = 'en', school = null, period = null, bat
     sections.push({ name: tr('Packing summary','Pakopsomming'), columns:[col('grade','Grade','Graad',14),col('book','Workbook','Werkboek',60),col('quantity','Books','Boeke',12,'integer')], rows:[...packing.values()] });
   }
   sections.push({ name: batch ? tr('Learner allocation','Leerdertoewysing') : tr('Paid learner register','Betaalde leerderlys'), columns, rows });
-  if (!school && !batch) sections.push({ name: tr('Transactions','Transaksies'), internal: true, columns:[col('school','School','Skool',28),col('year','Year','Jaar',9,'integer'),col('period','Ordering period','Bestelperiode',25),col('reference','Order reference','Bestelverwysing',30),col('parent','Parent','Ouer',28),col('email','Parent email','Ouer se e-pos',38),col('mobile','Parent mobile','Ouer se selfoon',20),col('amount','Order total (ZAR)','Besteltotaal (ZAR)',22,'money'),col('paidAt','Paid on (SAST)','Betaal op (SAST)',23,'date')], rows:orders.map(order=>({school:order.schools?.name||'',year:order.ordering_periods?.academic_years?.year,period:order.ordering_periods?.name||'',reference:order.reference,parent:`${order.parent_first_name} ${order.parent_last_name}`,email:order.parent_email,mobile:order.parent_mobile,amount:order.amount_cents/100,paidAt:order.paid_at})) });
+  if (!school && !batch) {
+    const hasRefunds=orders.some(order=>refundBalance(order).refunded_cents>0);
+    sections.push({name:tr('Transactions','Transaksies'),internal:true,columns:[
+      col('school','School','Skool',28),col('year','Year','Jaar',9,'integer'),col('period','Ordering period','Bestelperiode',25),col('reference','Order reference','Bestelverwysing',30),col('parent','Parent','Ouer',28),col('email','Parent email','Ouer se e-pos',38),col('mobile','Parent mobile','Ouer se selfoon',20),
+      ...(hasRefunds?[col('originalAmount','Original total (ZAR)','Oorspronklike totaal (ZAR)',22,'money'),col('refundedAmount','Refunded (ZAR)','Terugbetaal (ZAR)',22,'money')]:[]),
+      col('amount',hasRefunds?'Net paid (ZAR)':'Order total (ZAR)',hasRefunds?'Netto betaal (ZAR)':'Besteltotaal (ZAR)',22,'money'),col('paidAt','Paid on (SAST)','Betaal op (SAST)',23,'date')],
+      rows:orders.map(order=>{const balance=refundBalance(order);return {school:order.schools?.name||'',year:order.ordering_periods?.academic_years?.year,period:order.ordering_periods?.name||'',reference:order.reference,parent:`${order.parent_first_name} ${order.parent_last_name}`,email:order.parent_email,mobile:order.parent_mobile,originalAmount:balance.original_cents/100,refundedAmount:balance.refunded_cents/100,amount:balance.net_cents/100,paidAt:order.paid_at};})});
+  }
   return { language, school, period, batch, rows, orders, sections, capturedAt, schoolLogo:null,
     title: batch ? tr('School fulfilment batch','Skoolafleweringsbatch') : tr('Paid learner register','Betaalde leerderlys'),
     scope: school?.name || tr('All schools','Alle skole'),
     quantity: rows.reduce((sum,row)=>sum+row.quantity,0), orderCount: new Set(rows.map(row=>row.reference)).size,
-    totalCents:orders.reduce((sum,order)=>sum+order.amount_cents,0),
+    totalCents:orders.reduce((sum,order)=>sum+refundBalance(order).net_cents,0),
     hasDemo:rows.some(row=>row.reference?.startsWith('DEMO-')),
   };
 }

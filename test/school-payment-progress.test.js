@@ -47,7 +47,7 @@ test('staff HTML and text contain progress; parent confirmation never receives s
   const options={replyTo:'info@briljanteboeke.co.za',appOrigin:'https://example.test'};
   const staff=orderEmailContent(order,{...options,parent:false});
   assert.match(staff.html,/School progress/);assert.match(staff.html,/Progress by grade/);assert.match(staff.html,/Outstanding value/);assert.match(staff.text,/expected 4 \| paid 1 \| outstanding 3/);
-  assert.match(staff.text,/not an identified list of unpaid learners/);assert.match(staff.text,/Grade 2: expected 2 \| paid 0 \| outstanding 2/);
+  assert.match(staff.text,/not an identified list of children with unpaid orders/);assert.match(staff.text,/Grade 2: expected 2 \| paid 0 \| outstanding 2/);
   const parent=orderEmailContent(order,{...options,parent:true});assert.doesNotMatch(parent.html,/School progress|Progress by grade|Outstanding value/);assert.doesNotMatch(parent.text,/Books: expected/);
 });
 test('a staff notification cannot silently omit progress when the lookup fails',()=>{

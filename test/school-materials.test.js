@@ -6,6 +6,7 @@ import { PNG } from 'pngjs';
 import jsQR from 'jsqr';
 import sharp from 'sharp';
 import { createSchoolMaterialsHandler } from '../api/admin-school-materials.js';
+import {demoOrigin,demoSchoolId,demoStaffEmail} from '../api/_lib/demo-payment.js';
 import { normalizeSchoolLogo, logoPath, materialLink, qrPng, posterPdf, readSchoolLogo } from '../api/_lib/school-materials.js';
 
 const school={id:'11111111-1111-4111-8111-111111111111',slug:'test-school',name:'Test School'};
@@ -55,7 +56,7 @@ test('cross-origin logo upload fails before staff lookup or image decode',async(
   let authorized=0;const handler=createSchoolMaterialsHandler({checkOrigin(){throw Object.assign(Error('Blocked'),{statusCode:403});},authorize(){authorized++;}});
   const res=response();await handler({method:'POST',query:{}},res);assert.equal(res.code,403);assert.equal(authorized,0);
 });
-function fakeDatabase({foreignPeriod=false}={}){
+function fakeDatabase({foreignPeriod=false,schoolRecord=school}={}){
   const storageCalls=[],audits=[];
   return {storageCalls,audits,from(table){
     let filters=[],inserting=false;
@@ -64,7 +65,7 @@ function fakeDatabase({foreignPeriod=false}={}){
       then(resolve,reject){return Promise.resolve(execute(false)).then(resolve,reject);}};
     function execute(single){
       if(inserting)return {data:null,error:null};
-      const rows=table==='schools'?[school]:table==='ordering_periods'?[{...period,school_id:foreignPeriod?'other':school.id}]:[{school_id:school.id,ordering_period_id:period.id,active:true,grades:{code:'1'}}];
+      const rows=table==='schools'?[schoolRecord]:table==='ordering_periods'?[{...period,school_id:foreignPeriod?'other':schoolRecord.id}]:[{school_id:schoolRecord.id,ordering_period_id:period.id,active:true,grades:{code:'1'}}];
       const data=rows.filter(row=>filters.every(([key,value])=>row[key]===value));return {data:single?(data[0]??null):data,error:null};
     }return query;
   },storage:{from(bucket){return {async upload(path,bytes,options){storageCalls.push({bucket,path,bytes,options});return {error:null};},async download(){return {data:null,error:{statusCode:404,message:'Object not found'}};}};}}};
@@ -87,4 +88,22 @@ test('authenticated QR export is an uncached PNG attachment and absent logo is n
   const res=response();await handler({method:'GET',query:{school_id:school.id,period_id:period.id,format:'qr',lang:'en'}},res);
   assert.equal(res.code,200);assert.equal(res.headers['Content-Type'],'image/png');assert.equal(res.headers['Cache-Control'],'no-store');assert.match(res.headers['Content-Disposition'],/test-school-2027-qr.png/);
   assert.equal(await readSchoolLogo(db,school.id),null);
+});
+test('school materials cannot modify live logos from preview or expose the test school in production',async()=>{
+  const preview={DEMO_PAYMENTS_ENABLED:'true',VERCEL_ENV:'preview',APP_ORIGIN:demoOrigin,SUPABASE_URL:'https://cigyxjfzbjlgbrduzcpw.supabase.co'};
+  for(const [source,method,id,email,status] of [
+    [preview,'POST',school.id,demoStaffEmail,403],
+    [preview,'POST',demoSchoolId,'other@example.test',403],
+    [{...preview,DEMO_PAYMENTS_ENABLED:'false'},'POST',school.id,demoStaffEmail,403],
+    [{VERCEL_ENV:'production'},'POST',demoSchoolId,demoStaffEmail,404],
+    [{VERCEL_ENV:'production'},'GET',demoSchoolId,demoStaffEmail,404],
+  ]){
+    let reads=0;const handler=createSchoolMaterialsHandler({source,checkOrigin(){},authorize:async()=>({user:{id:school.id,email}}),databaseFactory(){reads++;throw Error('unexpected access');}});
+    const res=response();await handler({method,query:{school_id:id},body:{logo_base64:logo.toString('base64')}},res);
+    assert.equal(res.code,status);assert.equal(reads,0);
+  }
+  const testSchool={...school,id:demoSchoolId},db=fakeDatabase({schoolRecord:testSchool});
+  const handler=createSchoolMaterialsHandler({source:preview,checkOrigin(){},authorize:async()=>({user:{id:school.id,email:demoStaffEmail}}),databaseFactory:()=>db});
+  const res=response();await handler({method:'POST',query:{school_id:demoSchoolId},body:{logo_base64:logo.toString('base64')}},res);
+  assert.equal(res.code,200);assert.equal(db.storageCalls.length,1);assert.equal(db.storageCalls[0].path,logoPath(demoSchoolId));
 });

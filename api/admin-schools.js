@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { requireSameOrigin, requireStaff } from "./_lib/auth.js";
 import { sha256 } from "./_lib/crypto.js";
 import { env } from "./_lib/env.js";
+import { demoEnvironment, demoSchoolId, demoStaffEmail } from "./_lib/demo-payment.js";
 import { json, methodNotAllowed, publicError, readJson } from "./_lib/http.js";
 import { assertDatabaseResult, serviceClient } from "./_lib/supabase.js";
 import { optionalText, text, uuid } from "./_lib/validation.js";
@@ -14,18 +15,32 @@ export default async function handler(req, res) {
   return methodNotAllowed(res, ["GET", "POST"]);
 }
 
-async function list(req, res) {
+const list = createSchoolListHandler();
+export function createSchoolListHandler({authorize=requireStaff,databaseFactory=serviceClient,source=process.env}={}) {
+ return async function list(req, res) {
   try {
-    await requireStaff(req, res);
-    const database = serviceClient();
+    await authorize(req, res);
+    const database = databaseFactory();
+    const schoolsQuery = database.from("schools").select("id, slug, name, status, contact_name, contact_email, notes");
+    const periodsQuery = database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, delivery_note");
+    const offeringsQuery = database.from("school_grade_offerings").select("id, school_id, ordering_period_id, grade_id, book_id, price_cents, expected_quantity, active");
+    const accessQuery = database.from("school_access").select("id, school_id, ordering_period_id, label, code_hint, expires_at, revoked_at, last_used_at, created_at").is("revoked_at", null);
+    // The test school and all of its related rows belong only in the dedicated
+    // preview, even when the same database is used by the live deployment.
+    if (!demoEnvironment(source)) {
+      schoolsQuery.neq("id", demoSchoolId);
+      periodsQuery.neq("school_id", demoSchoolId);
+      offeringsQuery.neq("school_id", demoSchoolId);
+      accessQuery.neq("school_id", demoSchoolId);
+    }
     const [years, grades, books, schools, periods, offerings, access] = await Promise.all([
       database.from("academic_years").select("id, year, label, is_active").order("year", { ascending: false }),
       database.from("grades").select("id, code, name, sort_order").order("sort_order"),
       database.from("books").select("id, grade_id, sku, title, default_price_cents, cover_path, active"),
-      database.from("schools").select("id, slug, name, status, contact_name, contact_email, notes").order("name"),
-      database.from("ordering_periods").select("id, school_id, academic_year_id, name, opens_at, closes_at, status, delivery_note"),
-      database.from("school_grade_offerings").select("id, school_id, ordering_period_id, grade_id, book_id, price_cents, expected_quantity, active"),
-      database.from("school_access").select("id, school_id, ordering_period_id, label, code_hint, expires_at, revoked_at, last_used_at, created_at").is("revoked_at", null),
+      schoolsQuery.order("name"),
+      periodsQuery,
+      offeringsQuery,
+      accessQuery,
     ]);
     for (const result of [years, grades, books, schools, periods, offerings, access]) assertDatabaseResult(result.error);
     return json(res, 200, {
@@ -43,9 +58,10 @@ async function list(req, res) {
     return json(res, result.status, { error: result.message });
   }
 }
+}
 
 const save = createSchoolSaveHandler();
-export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize=requireStaff,databaseFactory=serviceClient}={}) {
+export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize=requireStaff,databaseFactory=serviceClient,source=process.env}={}) {
   return async function save(req, res) {
   try {
     checkOrigin(req);
@@ -53,10 +69,18 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
     const body = await readJson(req, 64_000);
     const database = databaseFactory();
     if (body?.action === 'create_academic_year') {
+      // Academic years are shared catalog data, never a preview-only record.
+      if (source.VERCEL_ENV === 'preview') throw Object.assign(new Error('Shared academic years cannot be changed from a preview.'), { statusCode: 403 });
       const result = await addAcademicYear(database, {user,staff}, body);
       return json(res, result.created ? 201 : 200, result);
     }
     const input = validate(body);
+    if (input.school.id === demoSchoolId && (!demoEnvironment(source) || user.email?.toLowerCase() !== demoStaffEmail)) {
+      throw Object.assign(new Error('The school was not found.'), { statusCode: 404 });
+    }
+    if (source.VERCEL_ENV === 'preview' && (!demoEnvironment(source) || input.school.id !== demoSchoolId || user.email?.toLowerCase() !== demoStaffEmail)) {
+      throw Object.assign(new Error('Preview changes are restricted to the dedicated test school and account.'), { statusCode: 403 });
+    }
     await assertPeriodYear(database, input.school.id, input.period);
 
     const { data: catalog, error: catalogError } = await database
@@ -193,6 +217,9 @@ export function createSchoolSaveHandler({checkOrigin=requireSameOrigin,authorize
 function validate(body) {
   const school = body?.school ?? {};
   const period = body?.period ?? {};
+  if (period.class_required != null && period.class_required !== false) {
+    throw Object.assign(new Error('Classes are not collected for parent orders.'), { statusCode: 400 });
+  }
   const offerings = Array.isArray(body?.offerings) ? body.offerings : [];
   if (offerings.length < 1 || offerings.length > 7) {
     const error = new Error("Select at least one participating grade.");

@@ -24,7 +24,7 @@ export function orderEmailContent(order, {parent, demo = false, replyTo, appOrig
   const progress = !parent ? order.school_progress : null;
   const progressDate = progress ? new Intl.DateTimeFormat('en-ZA',{timeZone:'Africa/Johannesburg',dateStyle:'medium',timeStyle:'short'}).format(new Date(progress.captured_at)) : '';
   const overallPercent = progress ? percentage(progress.grades.reduce((sum,g)=>sum+Math.min(g.expected,g.paid),0),progress.totals.expected) : 0;
-  const progressNote = 'Outstanding figures are based on the school’s expected quantities and configured prices, not an identified list of unpaid learners. Extra payments for one grade do not reduce another grade’s outstanding balance.';
+  const progressNote = 'Outstanding figures are based on the school’s expected quantities and configured prices, not an identified list of children with unpaid orders. Extra payments for one grade do not reduce another grade’s outstanding balance.';
   const progressText = progress ? ['School progress / Skoolvordering',`Snapshot: ${progressDate} (South Africa)`,
     `Books: expected ${progress.totals.expected} | paid ${progress.totals.paid} | outstanding ${progress.totals.outstanding}`,`Overall progress: ${overallPercent}% of expected books paid`,
     `Value: expected ${money(progress.totals.expected_value_cents)} | ${demo?'simulated paid':'paid'} ${money(progress.totals.paid_value_cents)} | outstanding ${money(progress.totals.outstanding_value_cents)}`,
@@ -69,7 +69,7 @@ ${parent ? `<p style="margin:0 0 12px;color:#424f5e;font-size:16px;line-height:2
 <p style="margin:0;color:#465d70;font-size:14px;line-height:23px;">Order / Bestelling<br><strong style="color:#18385f;">${escape(order.reference)}</strong></p></td></tr></table>
 <p style="margin:26px 0 4px;color:#18385f;font-size:17px;line-height:25px;font-weight:700;">${escape(school)}</p>
 ${year ? `<p style="margin:0 0 8px;color:#596675;font-size:13px;line-height:21px;">Academic year / Akademiese jaar: ${escape(year)}</p>` : ''}
-${rows ? `<table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;"><thead><tr><th align="left" style="padding:16px 0 8px;font-size:12px;color:#596675;border-bottom:1px solid #e1e7ec;">LEARNER AND WORKBOOK</th><th align="right" style="padding:16px 0 8px;font-size:12px;color:#596675;border-bottom:1px solid #e1e7ec;">AMOUNT</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+${rows ? `<table width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse:collapse;"><thead><tr><th align="left" style="padding:16px 0 8px;font-size:12px;color:#596675;border-bottom:1px solid #e1e7ec;">CHILD AND WORKBOOK</th><th align="right" style="padding:16px 0 8px;font-size:12px;color:#596675;border-bottom:1px solid #e1e7ec;">AMOUNT</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
 ${progressHtml}
 ${!parent ? `<h2 style="margin:26px 0 8px;font-size:16px;line-height:24px;color:#18385f;">Parent contact</h2><p style="margin:0;color:#596675;font-size:14px;line-height:24px;">${escape(order.parent_first_name)} ${escape(order.parent_last_name)}<br>${escape(order.parent_email)}<br>${escape(order.parent_mobile)}</p><p style="margin:26px 0;"><a href="${escape(appOrigin)}/admin/?lang=en" style="display:inline-block;background:#18385f;color:#ffffff;text-decoration:none;padding:14px 22px;font-size:14px;line-height:22px;font-weight:700;">View order dashboard</a></p>` : ''}
 <h2 style="margin:26px 0 8px;font-size:16px;line-height:24px;color:#18385f;">School delivery / Skoolaflewering</h2>

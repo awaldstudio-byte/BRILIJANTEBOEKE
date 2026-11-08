@@ -1,5 +1,6 @@
 import { requireSameOrigin, requireStaff } from './_lib/auth.js';
 import { env, requirePayFast } from './_lib/env.js';
+import { demoEnvironment, demoSchoolId, demoStaffEmail } from './_lib/demo-payment.js';
 import { json, methodNotAllowed, publicError, readJson } from './_lib/http.js';
 import { assertDatabaseResult, serviceClient } from './_lib/supabase.js';
 import { uuid } from './_lib/validation.js';
@@ -7,13 +8,17 @@ import { schoolIsOpen } from './_lib/school-ordering.js';
 import { logoBucket, logoPath, normalizeSchoolLogo, readSchoolLogo, materialLink, qrPng, posterPdf } from './_lib/school-materials.js';
 
 export default createSchoolMaterialsHandler();
-export function createSchoolMaterialsHandler({authorize=requireStaff,checkOrigin=requireSameOrigin,databaseFactory=serviceClient,configuration=env,checkPayments=requirePayFast,now=()=>Date.now()}={}) {
+export function createSchoolMaterialsHandler({authorize=requireStaff,checkOrigin=requireSameOrigin,databaseFactory=serviceClient,configuration=env,checkPayments=requirePayFast,now=()=>Date.now(),source=process.env}={}) {
   return async (req,res)=>{
     if(!['GET','POST'].includes(req.method))return methodNotAllowed(res,['GET','POST']);
     try {
       if(req.method==='POST')checkOrigin(req);
       const actor=await authorize(req,res,req.method==='POST'?['administrator']:['administrator','viewer']);
       const schoolId=uuid(req.query?.school_id,'Select a saved school.');
+      if(schoolId===demoSchoolId&&!demoEnvironment(source))throw Object.assign(Error('The school was not found.'),{statusCode:404});
+      if(req.method==='POST'&&source.VERCEL_ENV==='preview'&&(!demoEnvironment(source)||schoolId!==demoSchoolId||actor.user.email?.toLowerCase()!==demoStaffEmail)){
+        throw Object.assign(Error('Preview changes are restricted to the dedicated test school and account.'),{statusCode:403});
+      }
       const database=databaseFactory();
       const schoolResult=await database.from('schools').select('id, slug, name, status').eq('id',schoolId).maybeSingle();
       assertDatabaseResult(schoolResult.error);const school=schoolResult.data;

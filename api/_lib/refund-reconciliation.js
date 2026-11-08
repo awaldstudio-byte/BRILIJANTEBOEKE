@@ -8,6 +8,7 @@ const databaseErrors = {
   REFUND_NOT_PAID: ['Only a verified paid order can have a completed full refund recorded.', 409],
   REFUND_PAYMENT_MISMATCH: ['The PayFast transaction or full amount does not match the verified payment.', 409],
   REFUND_ALREADY_RECORDED: ['A different full refund record already exists for this order or confirmation reference. Review it before continuing.', 409],
+  REFUND_PARTIAL_ALREADY_RECORDED: ['A book refund or this provider reference has already been recorded. Review the order before continuing.', 409],
   REFUND_BATCH_REVIEW_REQUIRED: ['This order is allocated to a fulfilment batch. Cancel its unshipped batch first. Dispatched or delivered books require an operational review before a refund can be recorded here.', 409],
   REFUND_MAIL_IN_PROGRESS: ['An order confirmation is being sent. Wait for its recorded outcome before recording the refund.', 409],
   REFUND_DATE_INVALID: ['The completed refund date must be after payment and cannot be in the future.', 400],

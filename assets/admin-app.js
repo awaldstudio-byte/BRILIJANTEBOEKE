@@ -5,6 +5,8 @@ import { initSchoolMaterials } from './school-materials.js';
 import { initReportDownloads } from './report-downloads.js';
 import { allowedBatchStatuses, shippingUpdateSummary } from './shipping-status.js';
 import { initRefundReconciliation, refundAction } from './refund-reconciliation.js';
+import {confirmAdminAction} from './admin-confirmation.js';
+import { initOrderManagement, orderManagementAction, orderRefundNote } from './order-management.js';
 const query = new URLSearchParams(location.search);
 const preview = query.get("preview") === "1";
 const language = query.get("lang") === "en" ? "en" : "af";
@@ -13,6 +15,7 @@ const money = new Intl.NumberFormat(locale, { style: "currency", currency: "ZAR"
 const shortDate = new Intl.DateTimeFormat(locale, { day: "numeric", month: "short", year: "numeric" });
 const $ = (selector) => document.querySelector(selector);
 const state = { dashboard: null, progress: [], catalog: null, orders: [], batches: [] };
+let orderPage=1,orderTotal=0,orderPageSize=50,orderLoadGeneration=0;
 let shippingRefreshTimer,shippingRefreshCount=0;
 initReportDownloads({language});
 
@@ -21,6 +24,7 @@ const englishStatic = new Map([
   ["Meld aan", "Sign in"], ["Gebruik die Briljante-administrasierekening.", "Use the Briljante administration account."],
   ["E-posadres", "Email address"], ["Wagwoord", "Password"], ["Oorsig", "Overview"],
   ["Bestellings", "Orders"], ["Skole", "Schools"], ["Aflewering", "Fulfilment"], ["Verslae", "Reports"], ["Interne toegang vir Briljante Boeke", "Internal access for Briljante Boeke"],
+  ['Terugbetalingsversoeke per e-pos','Email refund requests'],
   ["BRILJANTE BOEKE ADMINISTRASIE", "BRILJANTE BOEKE ADMINISTRATION"], ["VORDERING", "PROGRESS"],
   ["Vordering", "Progress"],
   ["Bestellings per skool en graad", "Orders by school and grade"], ["Skool", "School"], ["Jaar", "Year"],
@@ -30,7 +34,7 @@ const englishStatic = new Map([
   ["Verwysing", "Reference"], ["Ouer", "Parent"], ["Bedrag", "Amount"], ["Status", "Status"],
   ["REKORDS", "RECORDS"], ["Laai betaalde kinderlys af", "Download paid child list"],
   ["Alle statusse", "All statuses"], ["Wag vir betaling", "Pending payment"], ["Betaling onsuksesvol", "Payment failed"],
-  ["Gekanselleer", "Cancelled"], ["Alle skole", "All schools"], ["Filter", "Filter"], ["Kinders", "Children"],
+  ["Gekanselleer", "Cancelled"], ["Terugbetaal", "Refunded"], ["Alle skole", "All schools"], ["Filter", "Filter"], ["Kinders", "Children"],
   ["Geen bestellings pas by die filter nie.", "No orders match the filter."], ["OPSTELLING", "SETUP"],
   ["Voeg skool by", "Add school"], ["Bestaande skole", "Existing schools"], ["SKOOL EN BESTELPERIODE", "SCHOOL AND ORDERING PERIOD"],
   ["Nuwe skool", "New school"], ["Skoolnaam", "School name"], ["Skakelfragment", "Link identifier"],
@@ -59,13 +63,14 @@ const englishStatic = new Map([
 ]);
 
 applyLanguage();
-document.querySelector('input[name="class_required"]')?.closest("label")?.remove();
 $("#today").textContent = new Intl.DateTimeFormat(locale, { day: "numeric", month: "long", year: "numeric" }).format(new Date());
 const staffAccess = initStaffAccess({ language, onAuthenticated: async staff => { showAdmin(staff); await loadData(); } });
 $('#staff-enable-mfa').addEventListener('click', () => { if (!preview) staffAccess.startSetup(); });
 const academicYears = initAcademicYears({state,preview,api,tr,setView,escapeHtml});
 initRefundReconciliation({rows:$('#all-order-rows'),getOrders:()=>state.orders,getStaff:()=>state.staff,preview,api,language,
   onRecorded:async()=>{await loadData();$('#order-filters').requestSubmit();}});
+initOrderManagement({rows:$('#all-order-rows'),queueButton:$('#refund-request-queue'),getStaff:()=>state.staff,preview,api,language,
+  onChanged:async()=>{await loadData();$('#order-filters').requestSubmit();}});
 init();
 
 async function init() {
@@ -116,6 +121,7 @@ async function loadData() {
   state.progress = preview ? previewProgress().progress : dashboard.progress;
   state.catalog = catalog;
   state.orders = orders.orders;
+  orderPage=orders.page||1;orderTotal=Number.isSafeInteger(orders.total)?orders.total:orders.orders.length;orderPageSize=orders.page_size||50;
   state.batches = fulfilment.batches;
   let demoNotice = $('#demo-data-notice');
   if (!demoNotice) { demoNotice = document.createElement('p'); demoNotice.id = 'demo-data-notice'; demoNotice.className = 'notice'; $('#admin-notices').append(demoNotice); }
@@ -124,6 +130,7 @@ async function loadData() {
   renderOverview();
   renderCatalog();
   renderOrders(state.orders);
+  renderOrderPagination();
   renderFulfilment();
 }
 
@@ -178,7 +185,7 @@ function renderOfferingFields(selected) {
 }
 
 function renderOrders(orders) {
-  $("#all-order-rows").innerHTML = orders.map((order) => `<tr><td>${shortDate.format(new Date(order.created_at))}</td><td>${escapeHtml(order.reference)}</td><td>${escapeHtml(order.schools?.name)}</td><td>${(order.learners ?? []).map((learner) => `${escapeHtml(learner.first_name)} ${escapeHtml(learner.last_name)} (${escapeHtml(localGrade(learner.grades?.name))})`).join("<br>")}</td><td>${escapeHtml(order.parent_first_name)} ${escapeHtml(order.parent_last_name)}<br><span class="quiet-text">${escapeHtml(order.parent_email)}</span></td><td>${money.format(order.amount_cents / 100)}</td><td>${statusPill(order.status)}${refundAction(order,{language,administrator:state.staff?.role==='administrator',preview})}</td></tr>`).join("");
+  $("#all-order-rows").innerHTML = orders.map((order) => `<tr><td>${shortDate.format(new Date(order.created_at))}</td><td>${escapeHtml(order.reference)}${orderManagementAction(order,{language,preview})}</td><td>${escapeHtml(order.schools?.name)}</td><td>${(order.learners ?? []).map((learner) => `${escapeHtml(learner.first_name)} ${escapeHtml(learner.last_name)} (${escapeHtml(localGrade(learner.grades?.name))})`).join("<br>")}</td><td>${escapeHtml(order.parent_first_name)} ${escapeHtml(order.parent_last_name)}<br><span class="quiet-text">${escapeHtml(order.parent_email)}</span></td><td>${money.format(order.amount_cents / 100)}${orderRefundNote(order,{language})}</td><td>${statusPill(order.status)}${(order.order_item_refunds||[]).length?'':refundAction(order,{language,administrator:state.staff?.role==='administrator',preview})}</td></tr>`).join("");
   $("#orders-empty").hidden = orders.length > 0;
 }
 
@@ -244,17 +251,30 @@ function setView(view) {
   $('.admin-main').scrollTo({ top: 0, left: 0, behavior: 'instant' });
 }
 
-$("#order-filters").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const params = new URLSearchParams(Object.fromEntries([...new FormData(event.currentTarget)].filter(([, value]) => value)));
+function renderOrderPagination(){
+  const nav=$('#orders-pagination');nav.hidden=orderTotal<=orderPageSize;
+  $('#orders-previous').disabled=orderPage<=1;$('#orders-next').disabled=orderPage*orderPageSize>=orderTotal;
+  $('#orders-previous').textContent=tr('Vorige','Previous');$('#orders-next').textContent=tr('Volgende','Next');
+  $('#orders-page-info').textContent=tr(`Bladsy ${orderPage} van ${Math.max(1,Math.ceil(orderTotal/orderPageSize))}`,`Page ${orderPage} of ${Math.max(1,Math.ceil(orderTotal/orderPageSize))}`);
+  nav.setAttribute('aria-label',tr('Bestelbladsye','Order pages'));
+}
+async function loadOrderPage(page){
+  const generation=++orderLoadGeneration;
+  const params = new URLSearchParams(Object.fromEntries([...new FormData($('#order-filters'))].filter(([, value]) => value)));
+  params.set('page',String(page));
   try {
-    const result = preview ? { orders: filterPreviewOrders(params) } : await api(`/api/admin-orders?${params}`);
-    state.orders = result.orders;
-    renderOrders(result.orders);
-  } catch (error) {
-    alert(error.message);
-  }
+    const result = preview ? { orders: filterPreviewOrders(params),page:1,total:filterPreviewOrders(params).length,page_size:50 } : await api(`/api/admin-orders?${params}`);
+    if(generation!==orderLoadGeneration)return;
+    state.orders=result.orders;orderPage=result.page||1;orderTotal=Number.isSafeInteger(result.total)?result.total:result.orders.length;orderPageSize=result.page_size||50;
+    renderOrders(result.orders);renderOrderPagination();
+  } catch(error) { if(generation===orderLoadGeneration)alert(error.message); }
+}
+$("#order-filters").addEventListener("submit", (event) => {
+  event.preventDefault();
+  loadOrderPage(1);
 });
+$('#orders-previous').addEventListener('click',()=>{if(orderPage>1)loadOrderPage(orderPage-1);});
+$('#orders-next').addEventListener('click',()=>{if(orderPage*orderPageSize<orderTotal)loadOrderPage(orderPage+1);});
 
 $("#school-list").addEventListener("click", (event) => {
   const button = event.target.closest("[data-edit-school]");
@@ -295,10 +315,12 @@ $("#batch-list").addEventListener("change", async (event) => {
   const previous = state.batches.find((batch) => batch.id === select.dataset.batchStatus)?.status;
   const notify=['dispatched','delivered'].includes(select.value);
   const confirmation=select.value==='dispatched'?tr('Bevestig dat hierdie batch versend is. Een e-pos per ouer in hierdie batch sal gereël word. DEMO-batchkennisgewings gaan slegs na technical@awaldstudio.com.','Confirm this batch has been dispatched. One email per parent in this batch will be queued. DEMO batch notifications go only to technical@awaldstudio.com.'):select.value==='delivered'?tr('Bevestig dat die skool hierdie batch ontvang het. Ouers sal van aflewering by die skool ingelig word; dit bevestig nie afhaling nie. DEMO-kennisgewings gaan slegs na technical@awaldstudio.com.','Confirm the school has received this batch. Parents will be notified of delivery to the school, not collection. DEMO notifications go only to technical@awaldstudio.com.'):tr('Werk die batchstatus op?','Update the batch status?');
-  if (!confirm(confirmation)) { select.value = previous; return; }
   select.disabled=true;
+  const nextStatus=select.value;
+  const accepted=await confirmAdminAction({title:tr('Bevestig batchopdatering','Confirm batch update'),message:confirmation,confirmLabel:tr('Bevestig','Confirm'),cancelLabel:tr('Kanselleer','Cancel')});
+  if(!accepted){select.value=previous;select.disabled=false;return;}
   try {
-    await api("/api/admin-fulfilment", { method: "PATCH", body: JSON.stringify({ id: select.dataset.batchStatus, status: select.value,confirm_notifications:notify }) });
+    await api("/api/admin-fulfilment", { method: "PATCH", body: JSON.stringify({ id: select.dataset.batchStatus, status: nextStatus,confirm_notifications:notify }) });
     shippingRefreshCount=0;
     state.batches = (await api("/api/admin-fulfilment")).batches;
     renderFulfilment();
@@ -602,7 +624,9 @@ function applyLanguage() {
   }
   document.querySelector(".admin-nav")?.setAttribute("aria-label", "Administration");
   const search = $("#order-filters [name=search]");
-  if (search) search.placeholder = "Reference, surname or email";
+  if (search) {search.placeholder = "Reference, surname or email";search.setAttribute('aria-label','Reference, surname or email');}
+  $('#order-filters [name=status]')?.setAttribute('aria-label','Order status');
+  $('#order-filters [name=school_id]')?.setAttribute('aria-label','School');
 }
 
 function tr(afrikaans, english) { return language === "en" ? english : afrikaans; }

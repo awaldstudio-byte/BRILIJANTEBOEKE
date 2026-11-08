@@ -10,6 +10,7 @@ const input={action:'record-full-refund',order_id:orderId,provider_payment_id:'1
   amount_cents:66000,refunded_at:'2026-10-26T14:00:00Z',reason:'Customer requested cancellation',confirm_external_refund:true};
 const order={id:orderId,reference:'BB-26-REFUND-QA',status:'paid',amount_cents:66000,schools:{name:'Test School'},parent_first_name:'Example',parent_last_name:'Parent',payment_attempts:[{status:'complete',provider_payment_id:'12345678'}]};
 function response(){return {headers:{},setHeader(k,v){this.headers[k]=v;},status(code){this.code=code;return this;},json(body){this.body=body;return this;}};}
+function guardedDatabase(rpc,record={reference:'BB-REAL',school_id:'33333333-3333-4333-8333-333333333333'}){return {from(){return{select(){return this;},eq(){return this;},async maybeSingle(){return{data:record,error:null};}};},rpc};}
 
 test('refund reconciliation requires explicit external completion, full integer amount and a past timestamp',()=>{
   const result=refundInput(input,now);
@@ -46,16 +47,22 @@ test('invalid confirmation never invokes the refund RPC',async()=>{
 
 test('new and idempotently repeated recordings return their distinct result without moving money',async()=>{
   for(const reused of [false,true]){
-    const handler=createAdminOrdersHandler({databaseFactory:()=>({async rpc(name,args){assert.equal(name,'record_completed_full_refund');assert.equal(args.p_actor,actor);return{data:{order_status:'refunded',reused}};}}),checkOrigin(){},authorize:async()=>({user:{id:actor}}),now:()=>now});
+    const handler=createAdminOrdersHandler({databaseFactory:()=>guardedDatabase(async(name,args)=>{assert.equal(name,'record_completed_full_refund');assert.equal(args.p_actor,actor);return{data:{order_status:'refunded',reused}};}),checkOrigin(){},authorize:async()=>({user:{id:actor}}),now:()=>now,source:{VERCEL_ENV:'production'}});
     const res=response();await handler({method:'POST',body:input},res);assert.equal(res.code,reused?200:201);assert.equal(res.body.money_moved,false);assert.equal(res.headers['Cache-Control'],'no-store');
   }
 });
 
 test('mismatched payment, duplicate record, active batch and in-flight mail failures stay actionable',async()=>{
   for(const code of ['REFUND_PAYMENT_MISMATCH','REFUND_ALREADY_RECORDED','REFUND_BATCH_REVIEW_REQUIRED','REFUND_MAIL_IN_PROGRESS']){
-    const handler=createAdminOrdersHandler({databaseFactory:()=>({async rpc(){return{error:{message:code}};}}),checkOrigin(){},authorize:async()=>({user:{id:actor}}),now:()=>now});
+    const handler=createAdminOrdersHandler({databaseFactory:()=>guardedDatabase(async()=>({error:{message:code}})),checkOrigin(){},authorize:async()=>({user:{id:actor}}),now:()=>now,source:{VERCEL_ENV:'production'}});
     const res=response();await handler({method:'POST',body:input},res);assert.equal(res.code,409);assert.doesNotMatch(res.body.error,/REFUND_/);
   }
+});
+test('legacy full refund cannot mutate a real order from preview or a demo order from production',async()=>{
+ for(const [source,record] of [[{VERCEL_ENV:'preview'},{reference:'BB-REAL',school_id:'33333333-3333-4333-8333-333333333333'}],[{VERCEL_ENV:'production'},{reference:'DEMO-BB-TEST',school_id:'edabcd03-1854-43ca-ac93-45c71e9ef012'}]]){
+  let calls=0;const handler=createAdminOrdersHandler({databaseFactory:()=>guardedDatabase(async()=>{calls++;},record),checkOrigin(){},authorize:async()=>({user:{id:actor,email:'technical@awaldstudio.com'}}),now:()=>now,source});
+  const res=response();await handler({method:'POST',body:input},res);assert.equal(res.code,403);assert.equal(calls,0);
+ }
 });
 
 test('refund UI only offers recording to an administrator with one verified-looking completed payment',()=>{

@@ -67,9 +67,23 @@ test('real report loader reconciles item amounts and loads a logo only for an ex
   const items=rows.map((row,index)=>({id:String(index),order_id:'a',description_snapshot:row.book,quantity:row.quantity,line_total_cents:row.lineCents,learners:{first_name:row.learner.split(' ')[0],last_name:'Smith',grades:{name:row.grade}},orders:{status:'paid',paid_at:capturedAt,school_id:school.id,ordering_period_id:period.id}}));
   const db={from(table){let filters=[];const q={select(){return q;},eq(key,value){filters.push([key,value]);return q;},lte(){return q;},order(){return q;},limit(){return q;},gt(){return q;},maybeSingle:async()=>({data:table==='schools'?school:period,error:null}),then(resolve){recorded.push({table,filters});resolve({data:table==='orders'?orders:items,error:null});}};return q;}};
   let logos=0;const logoReader=async()=>{logos++;return null;};
-  const all=await loadReport(db,{language:'en'}, {now:()=>capturedAt,logoReader});assert.equal(all.quantity,2);assert.equal(all.totalCents,66000);assert.equal(logos,0);
-  const scoped=await loadReport(db,{language:'en',school_id:school.id,period_id:period.id},{now:()=>capturedAt,logoReader});assert.equal(scoped.school.name,school.name);assert.equal(logos,1);assert.ok(recorded.some(query=>query.table==='order_items'&&query.filters.some(([key,value])=>key==='orders.school_id'&&value===school.id)));
-  items[0].line_total_cents=1;await assert.rejects(loadReport(db,{language:'en'},{now:()=>capturedAt,logoReader}),{statusCode:409});
+  const all=await loadReport(db,{language:'en'}, {now:()=>capturedAt,logoReader,demoMode:true});assert.equal(all.quantity,2);assert.equal(all.totalCents,66000);assert.equal(logos,0);
+  const scoped=await loadReport(db,{language:'en',school_id:school.id,period_id:period.id},{now:()=>capturedAt,logoReader,demoMode:true});assert.equal(scoped.school.name,school.name);assert.equal(logos,1);assert.ok(recorded.some(query=>query.table==='order_items'&&query.filters.some(([key,value])=>key==='orders.school_id'&&value===school.id)));
+  items[0].line_total_cents=1;await assert.rejects(loadReport(db,{language:'en'},{now:()=>capturedAt,logoReader,demoMode:true}),{statusCode:409});
+});
+test('live paid reports exclude demonstration orders and preview may include them',async()=>{
+ const demo={...orders[0]},real={...orders[0],id:'b',reference:'BB-REAL'};
+ const row=(order,id)=>({id,order_id:order.id,description_snapshot:'Workbook',quantity:1,line_total_cents:66000,learners:{first_name:'Test',last_name:'Learner',grades:{name:'Grade 1'}},orders:{reference:order.reference,status:'paid',paid_at:capturedAt,school_id:school.id,ordering_period_id:period.id}});
+ const rawOrders=[demo,real],rawItems=[row(demo,'a'),row(real,'b')],filters=[];
+ const db={from(table){let exclude=false;const q={select(){return q;},eq(){return q;},lte(){return q;},not(key,operator,value){filters.push([key,operator,value]);exclude=true;return q;},neq(key,value){filters.push([key,'neq',value]);return q;},order(){return q;},limit(){return q;},then(resolve){const data=table==='orders'?rawOrders:rawItems;resolve({data:exclude?data.filter(x=>!(x.reference||x.orders.reference).startsWith('DEMO-')):data,error:null});}};return q;}};
+ const live=await loadReport(db,{language:'en'},{demoMode:false});assert.equal(live.quantity,1);assert.equal(live.totalCents,66000);assert.equal(live.hasDemo,false);assert.ok(filters.some(([key])=>key==='reference'));assert.ok(filters.some(([key])=>key==='orders.reference'));
+ const preview=await loadReport(db,{language:'en'},{demoMode:true});assert.equal(preview.quantity,2);assert.equal(preview.totalCents,132000);assert.equal(preview.hasDemo,true);
+});
+test('live batch reports reject the dedicated test school and any mixed demonstration batch',async()=>{
+ const demoSchool='edabcd03-1854-43ca-ac93-45c71e9ef012',batchId='99999999-9999-4999-8999-999999999999';let batchSchool=demoSchool;
+ const db={from(table){const q={select(){return q;},eq(){return q;},order(){return q;},limit(){return q;},maybeSingle:async()=>({data:table==='fulfilment_batches'?{id:batchId,school_id:batchSchool,ordering_period_id:period.id}:table==='schools'?school:period,error:null}),then(resolve){resolve({data:[{id:'x',order_reference:'DEMO-BB-TEST'}],error:null});}};return q;}};
+ await assert.rejects(loadReport(db,{report:'batch',batch_id:batchId},{demoMode:false}),{statusCode:404});
+ batchSchool=school.id;await assert.rejects(loadReport(db,{report:'batch',batch_id:batchId},{demoMode:false}),{statusCode:404});
 });
 test('download routes deliver matching attachments and reject unsupported methods',async()=>{
   const handler=createReportHandler({authorize:async()=>{},databaseFactory:()=>({}),load:async()=>fixture()});

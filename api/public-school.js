@@ -2,11 +2,11 @@ import { env, requirePayFast } from './_lib/env.js';
 import { json, methodNotAllowed, publicError } from './_lib/http.js';
 import { assertDatabaseResult, serviceClient } from './_lib/supabase.js';
 import { resolveSchoolOrdering } from './_lib/school-ordering.js';
-import { canDemoPay } from './_lib/demo-payment.js';
+import { canDemoPay, demoEnvironment, demoSchoolId } from './_lib/demo-payment.js';
 import { canSandboxPay } from './_lib/sandbox-payment.js';
 
 export default createPublicSchoolHandler();
-export function createPublicSchoolHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now() } = {}) {
+export function createPublicSchoolHandler({ databaseFactory = serviceClient, configuration = env, checkPayments = requirePayFast, now = () => Date.now(), source = process.env } = {}) {
   return async function handler(req, res) {
     if (req.method !== 'GET') return methodNotAllowed(res, ['GET']);
     try {
@@ -16,6 +16,9 @@ export function createPublicSchoolHandler({ databaseFactory = serviceClient, con
         identifier: typeof req.query.identifier === 'string' ? req.query.identifier.trim() : '',
         periodId: typeof req.query.period === 'string' ? req.query.period : '',
       }, now());
+      // The seeded test school is never a public live school, even if its
+      // ordering period remains open in the shared database.
+      if (school.id === demoSchoolId && !demoEnvironment(source)) throw Object.assign(new Error('This school ordering link is unavailable.'), {statusCode:404});
       const { data: offerings, error } = await database.from('school_grade_offerings')
         .select('id, price_cents, grades(id, code, name, sort_order), books(id, sku, title, cover_path)')
         .eq('school_id', school.id).eq('ordering_period_id', period.id).eq('active', true)
@@ -26,7 +29,7 @@ export function createPublicSchoolHandler({ databaseFactory = serviceClient, con
       try {
         const settings = checkPayments(configuration());
         sandboxEnabled = settings?.payfastMode === 'sandbox' && open && await canSandboxPay(req,res,school);
-        paymentsEnabled = settings?.payfastMode !== 'sandbox' || sandboxEnabled;
+        paymentsEnabled = (settings?.payfastMode !== 'sandbox' && source.VERCEL_ENV === 'production' && school.id !== demoSchoolId) || sandboxEnabled;
       } catch { /* Checkout remains disabled until configured. */ }
       return json(res, 200, {
         payments_enabled: paymentsEnabled,

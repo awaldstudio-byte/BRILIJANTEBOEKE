@@ -14,7 +14,9 @@ const databaseErrors={BATCH_NOT_FOUND:['The batch was not found.',404],EMPTY_BAT
 export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requireSameOrigin,databaseFactory=serviceClient,source=process.env,schedule=waitUntil,launch=scheduleShippingMail}={}){
   async function batchContext(database,id){
     const result=await database.from('fulfilment_batches').select('id,school_id,ordering_period_id,status,label').eq('id',id).maybeSingle();assertDatabaseResult(result.error);if(!result.data)throw fail('The batch was not found.',404);
+    if(!demoEnvironment(source)&&result.data.school_id===demoSchoolId)throw fail('The batch was not found.',404);
     const first=await database.from('fulfilment_batch_items').select('order_reference').eq('batch_id',id).order('id').limit(1);assertDatabaseResult(first.error);if(!first.data?.length)throw fail('The batch contains no books.',409);
+    if(!demoEnvironment(source)&&first.data[0].order_reference.startsWith('DEMO-'))throw fail('The batch was not found.',404);
     return {...result.data,demo:first.data[0].order_reference.startsWith('DEMO-')};
   }
   function sendingAllowed(batch,user){
@@ -22,12 +24,19 @@ export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requ
     else if(source.VERCEL_ENV!=='production')throw fail('Live parent shipping emails are not enabled on the preview.',403);
     try{const settings=shippingSettings(source);if(settings.demoOnly!==batch.demo)throw Error();}catch{throw fail('The shipping email sender is not configured for this environment.',503);}
   }
+  function mutationAllowed(batch,user){
+    if(source.VERCEL_ENV==='production'){
+      if(batch.demo||batch.school_id===demoSchoolId)throw fail('The batch was not found.',404);
+    }else if(!demoEnvironment(source)||!batch.demo||batch.school_id!==demoSchoolId||user.email?.toLowerCase()!==demoStaffEmail){
+      throw fail('Preview changes are restricted to the technical test account and test school.',403);
+    }
+  }
   return async function handler(req,res){
     if(!['GET','POST','PATCH'].includes(req.method))return methodNotAllowed(res,['GET','POST','PATCH']);
     try{
       if(req.method==='POST'&&req.headers['x-briljante-shipping-worker']==='1'){
         const body=await readJson(req,2000);if(!verifyShippingWork(body,source))throw fail('Shipping worker access denied.',403);
-        shippingSettings(source);launch({database:databaseFactory(),batchId:body.batch_id,hop:body.hop,schedule,source});return json(res,202,{accepted:true});
+        shippingSettings(source);const workerDatabase=databaseFactory();const batch=await batchContext(workerDatabase,body.batch_id);if(source.VERCEL_ENV!=='production'&&(!demoEnvironment(source)||!batch.demo||batch.school_id!==demoSchoolId))throw fail('Preview changes are restricted to the test school.',403);launch({database:workerDatabase,batchId:body.batch_id,hop:body.hop,schedule,source});return json(res,202,{accepted:true});
       }
       if(req.method!=='GET')checkOrigin(req);
       const {user}=await authorize(req,res,req.method==='GET'?['administrator','viewer']:['administrator']);
@@ -40,8 +49,10 @@ export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requ
           res.setHeader('Cache-Control','private, no-store');res.setHeader('Content-Type','text/html; charset=utf-8');res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Content-Security-Policy',"default-src 'none'; img-src data:; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'");
           return res.status(200).send(shippingEmailPreview(result.data[0].payload));
         }
+        let batchQuery=database.from('fulfilment_batches').select('id,school_id,ordering_period_id,label,status,created_at,dispatched_at,delivered_at,schools(name),ordering_periods(name,academic_years(year)),fulfilment_batch_items(count)');
+        if(!demoEnvironment(source))batchQuery=batchQuery.neq('school_id',demoSchoolId);
         const [batches,counts]=await Promise.all([
-          database.from('fulfilment_batches').select('id,school_id,ordering_period_id,label,status,created_at,dispatched_at,delivered_at,schools(name),ordering_periods(name,academic_years(year)),fulfilment_batch_items(count)').order('created_at',{ascending:false}),
+          batchQuery.order('created_at',{ascending:false}),
           database.rpc('shipping_notification_counts'),
         ]);assertDatabaseResult(batches.error);assertDatabaseResult(counts.error);
         return json(res,200,{batches:(batches.data||[]).map(batch=>({...batch,notifications:(counts.data||[]).filter(row=>row.batch_id===batch.id)}))});
@@ -52,12 +63,15 @@ export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requ
       }
       if(req.method==='POST'){
         const schoolId=uuid(body?.school_id),periodId=uuid(body?.period_id),label=optionalText(body?.label,160);if(label.length<2)throw fail('Enter a batch name.');
+        if(!demoEnvironment(source)&&schoolId===demoSchoolId)throw fail('The school was not found.',404);
+        if(source.VERCEL_ENV!=='production'&&(!demoEnvironment(source)||schoolId!==demoSchoolId||user.email?.toLowerCase()!==demoStaffEmail))throw fail('Preview changes are restricted to the technical test account and test school.',403);
         const result=await database.rpc('create_fulfilment_batch',{p_school_id:schoolId,p_ordering_period_id:periodId,p_label:label,p_created_by:user.id});assertDatabaseResult(result.error);
         const audit=await database.from('audit_events').insert({actor_user_id:user.id,action:'fulfilment_batch_created',entity_type:'fulfilment_batch',entity_id:result.data.id,details:{school_id:schoolId,ordering_period_id:periodId,item_count:result.data.item_count}});assertDatabaseResult(audit.error);
         return json(res,201,{batch:result.data});
       }
       const id=uuid(body?.id);if(!statuses.has(body?.status))throw fail('Select a valid fulfilment status.');
       const batch=await batchContext(database,id);
+      mutationAllowed(batch,user);
       if(notifyStatus(body.status)){if(body.confirm_notifications!==true)throw fail('Confirm the parent shipping update before changing this status.',409);sendingAllowed(batch,user);}
       const changed=await database.rpc('transition_fulfilment_batch',{p_batch_id:id,p_status:body.status,p_actor:user.id,p_demo:batch.demo});assertDatabaseResult(changed.error);
       let started=false;
