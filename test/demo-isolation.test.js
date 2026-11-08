@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {createAdminDashboardHandler} from '../api/admin-dashboard.js';
 import {createAdminOrdersHandler} from '../api/admin-orders.js';
 import {createFulfilmentHandler} from '../api/admin-fulfilment.js';
-import {createOrderManagementHandler} from '../api/admin-order-management.js';
+import {createOrderManagementHandler} from '../api/_lib/admin-order-management-handler.js';
 import {demoSchoolId,demoOrigin} from '../api/_lib/demo-payment.js';
 const realSchool='11111111-1111-4111-8111-111111111111',demoOrder='22222222-2222-4222-8222-222222222222',realOrder='33333333-3333-4333-8333-333333333333',demoBatch='44444444-4444-4444-8444-444444444444',realBatch='55555555-5555-4555-8555-555555555555';
 const preview={VERCEL_ENV:'preview',DEMO_PAYMENTS_ENABLED:'true',APP_ORIGIN:demoOrigin,SUPABASE_URL:'https://cigyxjfzbjlgbrduzcpw.supabase.co'},production={VERCEL_ENV:'production'};

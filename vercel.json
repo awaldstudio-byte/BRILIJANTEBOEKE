@@ -1,6 +1,10 @@
 {
   "cleanUrls": false,
   "trailingSlash": true,
+  "rewrites": [
+    { "source": "/api/admin-order-management", "destination": "/api/admin-orders?management=1" },
+    { "source": "/api/admin-order-management/", "destination": "/api/admin-orders?management=1" }
+  ],
   "functions": {
     "api/admin-login.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },
     "api/payfast-notify.js": { "maxDuration": 120, "includeFiles": "assets/images/logo.png" },

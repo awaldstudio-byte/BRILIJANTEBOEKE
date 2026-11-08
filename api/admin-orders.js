@@ -6,6 +6,7 @@ import { readSchoolPaymentProgress } from './_lib/school-payment-progress.js';
 import { env } from './_lib/env.js';
 import {recordFullRefund,refundInput} from './_lib/refund-reconciliation.js';
 import {demoEnvironment,demoStaffEmail,excludeDemoOrders,isDemoRecord} from './_lib/demo-payment.js';
+import {createOrderManagementHandler} from './_lib/admin-order-management-handler.js';
 
 export function createAdminOrdersHandler({ authorize = requireStaff, checkOrigin = requireSameOrigin, databaseFactory = serviceClient, now = Date.now, source=process.env } = {}) {
 return async function handler(req, res) {
@@ -74,4 +75,13 @@ return async function handler(req, res) {
   }
 };
 }
-export default createAdminOrdersHandler();
+// Both public routes use this function so the application remains within the
+// hosting plan's function allowance. Each handler retains its own authorization.
+export function createAdminOrderRouter({ordersHandler=createAdminOrdersHandler(),managementHandler=createOrderManagementHandler()}={}) {
+  return function handler(req,res) {
+    const management=req.query?.management;
+    if(management!==undefined&&management!=='1')return json(res,400,{error:'Invalid order route.'});
+    return management==='1'?managementHandler(req,res):ordersHandler(req,res);
+  };
+}
+export default createAdminOrderRouter();

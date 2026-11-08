@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {managementInput,managementError,withRefundTotals} from '../api/_lib/order-management.js';
-import {createOrderManagementHandler} from '../api/admin-order-management.js';
+import {createOrderManagementHandler} from '../api/_lib/admin-order-management-handler.js';
 const id='11111111-1111-4111-8111-111111111111',actor='22222222-2222-4222-8222-222222222222',item='33333333-3333-4333-8333-333333333333';
 const now=Date.parse('2026-10-28T08:00:00Z');
 const request={action:'record-refund-request',order_id:id,expected_version:0,item_ids:[item],reason:'Parent requested one book refund',email_received_at:'2026-10-28T07:00:00Z'};
