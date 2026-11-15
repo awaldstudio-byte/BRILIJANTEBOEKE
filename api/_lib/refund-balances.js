@@ -11,9 +11,12 @@ export function refundBalance(order) {
   return {original_cents:order.amount_cents,refunded_cents:refunded,net_cents:order.amount_cents-refunded};
 }
 export function isRefundedItem(item) {
-  const refunds = item.order_item_refunds ?? [];
-  if (!Array.isArray(refunds)) throw invalid();
-  return refunds.length > 0;
+  const refund = item.order_item_refunds;
+  if (refund == null) return false;
+  if (Array.isArray(refund)) return refund.length > 0;
+  // A unique order_item_id makes this a to-one relationship in PostgREST.
+  if (typeof refund === 'object' && typeof refund.id === 'string' && refund.id) return true;
+  throw invalid();
 }
 export async function readFinancialRows(factory) {
   const rows=[];

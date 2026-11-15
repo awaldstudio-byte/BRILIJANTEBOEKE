@@ -91,10 +91,20 @@ export function initOrderManagement({rows,queueButton,getStaff,preview,api,langu
     if(busy||getStaff()?.role!=='administrator'||!detail||!form.reportValidity())return;
     const message=form.querySelector('[data-management-message]'),values=Object.fromEntries(new FormData(form)),action=form.dataset.managementForm;
     let payload;try{payload=managementPayload(action,values,detail.order,{requestId:form.dataset.requestId,itemIds:[...form.querySelectorAll('[name=item_ids]:checked')].map(input=>input.value)});}catch(error){message.textContent=language==='en'?error.message:action==='record-refund-request'?copy('Kies minstens een boek en ’n geldige datum.',''):copy('Kontroleer die datum en bevestig die voltooide terugbetaling.','');return;}
+    const orderId=detail.order.id;
     busy=true;for(const control of dialog.querySelectorAll('button,input,textarea,select'))control.disabled=true;message.textContent=copy('Word gestoor…','Saving…');let saved=false;
-    try{const result=await api('/api/admin-order-management/',{method:'POST',body:JSON.stringify(payload)});if(result.money_moved!==false)throw Error(copy('Die uitkoms moet nagegaan word. Moenie die aksie herhaal nie.','The outcome needs review. Do not repeat the action.'));saved=true;await onChanged();await loadOrder(detail.order.id,copy('Verandering aangeteken. Geen geld is deur hierdie aksie gestuur nie.','Change recorded. This action sent no money.'));}
+    try{
+      const result=await api('/api/admin-order-management/',{method:'POST',body:JSON.stringify(payload)});
+      if(result.money_moved!==false)throw Error(copy('Die uitkoms moet nagegaan word. Moenie die aksie herhaal nie.','The outcome needs review. Do not repeat the action.'));
+      saved=true;
+      await loadOrder(orderId,copy('Verandering aangeteken. Geen geld is deur hierdie aksie gestuur nie.','Change recorded. This action sent no money.'));
+    }
     catch(error){message.textContent=saved?copy('Die verandering is gestoor. Maak toe en herlaai om die jongste besonderhede te sien.','The change was saved. Close and reload to see the latest details.'):error.message;}
     finally{busy=false;if(dialog?.open)for(const control of dialog.querySelectorAll('button,input,textarea,select'))control.disabled=saved&&dialog.contains(form)&&!control.matches('[data-management-close]');}
+    if(saved) {
+      try{await onChanged();}
+      catch{console.warn('Order saved, but the dashboard refresh failed.');}
+    }
   }
   rows.addEventListener('click',event=>{const button=event.target.closest('[data-manage-order]');if(!button||preview)return;createDialog(button);loadOrder(button.dataset.manageOrder);});
   async function loadQueue(page=1){

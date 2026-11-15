@@ -96,3 +96,69 @@ test('stale detail responses cannot overwrite the newer order or a closed dialog
     assert.match(dialogs[2].innerHTML,/role="alert"/);assert.match(dialogs[2].innerHTML,/&lt;unsafe error&gt;/);
   }finally{globalThis.document=original;}
 });
+
+test('a saved refund updates the dialog even if the separate dashboard refresh fails',async t=>{
+  const feedback={textContent:''};
+  const heading={focus(){}};
+  const events={};
+  const dialog={
+    open:false,
+    innerHTML:'',
+    addEventListener(name,handler){events[name]=handler;},
+    querySelector(selector){return selector==='h2'?heading:feedback;},
+    querySelectorAll(){return [];},
+    setAttribute(){},
+    showModal(){this.open=true;},
+  };
+  const rows={addEventListener(_event,handler){this.click=handler;}};
+  const form={
+    dataset:{managementForm:'record-item-refund',requestId:'request-1'},
+    reportValidity:()=>true,
+    querySelector:()=>({textContent:''}),
+    querySelectorAll:()=>[],
+  };
+  t.mock.method(console,'warn',()=>{});
+  const originalDocument=globalThis.document;
+  const originalFormData=globalThis.FormData;
+  globalThis.document={body:{append(){}},createElement:()=>dialog};
+  globalThis.FormData=class {
+    *[Symbol.iterator](){
+      yield ['provider_payment_id','12345'];
+      yield ['provider_refund_reference','R-1'];
+      yield ['refunded_at','2026-10-28T07:00:00Z'];
+      yield ['reason','Refund recorded'];
+      yield ['confirm_external_refund','on'];
+    }
+  };
+  try {
+    let refunded=false;
+    initOrderManagement({
+      rows,
+      getStaff:()=>({role:'administrator'}),
+      preview:false,
+      language:'en',
+      onChanged:async()=>{throw Error('Dashboard unavailable');},
+      api:async (_url,options)=>{
+        if(options?.method==='POST'){
+          refunded=true;
+          return {money_moved:false};
+        }
+        if(!refunded)return detail;
+        return {...detail,order:{
+          ...order,
+          refunded_amount_cents:32000,
+          remaining_paid_amount_cents:34000,
+          order_item_refunds:[{order_item_id:'item-1',amount_cents:32000}],
+        }};
+      },
+    });
+    rows.click({target:{closest:()=>({dataset:{manageOrder:order.id},focus(){}})}});
+    await new Promise(setImmediate);
+    await events.submit({target:{closest:()=>form},preventDefault(){}});
+    assert.match(dialog.innerHTML,/Partially refunded/);
+    assert.match(feedback.textContent,/Change recorded/);
+  } finally {
+    globalThis.document=originalDocument;
+    globalThis.FormData=originalFormData;
+  }
+});
