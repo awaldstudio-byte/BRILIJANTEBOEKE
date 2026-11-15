@@ -288,11 +288,18 @@ $("#batch-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
   const message = $("#batch-message");
-  if (!confirm(tr("Skep ’n vaste afleweringsbatch vir hierdie skool? Latere betalings sal nie by hierdie batch gevoeg word nie.", "Create a fixed fulfilment batch for this school? Later payments will not be added to this batch."))) return;
   const button = form.querySelector("button[type=submit]");
+  if (button.disabled) return;
   button.disabled = true;
-  message.textContent = "";
   try {
+    const accepted = await confirmAdminAction({
+      title: tr("Bevestig nuwe batch", "Confirm new batch"),
+      message: tr("Skep ’n vaste afleweringsbatch vir hierdie skool? Latere betalings sal nie by hierdie batch gevoeg word nie.", "Create a fixed fulfilment batch for this school? Later payments will not be added to this batch."),
+      confirmLabel: tr("Skep batch", "Create batch"),
+      cancelLabel: tr("Kanselleer", "Cancel"),
+    });
+    if (!accepted) return;
+    message.textContent = "";
     if (preview) {
       message.textContent = tr("Voorskoumodus: die voorbeeldbatch is gereed om af te laai.", "Preview mode: the example batch is ready to download.");
       return;
