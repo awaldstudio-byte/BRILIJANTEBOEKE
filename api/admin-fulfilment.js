@@ -10,7 +10,15 @@ import {shippingEmailPreview} from './_lib/shipping-email.js';
 const statuses=new Set(['created','packing','ready','dispatched','delivered','cancelled']);
 const notifyStatus=status=>['dispatched','delivered'].includes(status);
 const fail=(message,statusCode=400)=>Object.assign(Error(message),{statusCode});
-const databaseErrors={BATCH_NOT_FOUND:['The batch was not found.',404],EMPTY_BATCH:['The batch contains no books.',409],INVALID_BATCH_TRANSITION:['This status change is not allowed. Dispatched batches can only be marked delivered; delivered and cancelled batches are final.',409],BATCH_RECORDS_REQUIRE_REVIEW:['Some batch records are unpaid, refunded, from another school, or mix test and live orders. Review this batch before continuing.',409],INVALID_DEMO_BATCH:['Demo updates are restricted to the dedicated test school.',403]};
+const databaseErrors={
+  INVALID_SCHOOL_PERIOD:['Choose an ordering period for this school.',400],
+  NO_PAID_ITEMS_AVAILABLE:['There are no paid books available to add to a batch for this period. Books already in a batch and refunded books are excluded.',409],
+  BATCH_NOT_FOUND:['The batch was not found.',404],
+  EMPTY_BATCH:['The batch contains no books.',409],
+  INVALID_BATCH_TRANSITION:['This status change is not allowed. Dispatched batches can only be marked delivered; delivered and cancelled batches are final.',409],
+  BATCH_RECORDS_REQUIRE_REVIEW:['Some batch records are unpaid, refunded, from another school, or mix test and live orders. Review this batch before continuing.',409],
+  INVALID_DEMO_BATCH:['Demo updates are restricted to the dedicated test school.',403],
+};
 export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requireSameOrigin,databaseFactory=serviceClient,source=process.env,schedule=waitUntil,launch=scheduleShippingMail}={}){
   async function batchContext(database,id){
     const result=await database.from('fulfilment_batches').select('id,school_id,ordering_period_id,status,label').eq('id',id).maybeSingle();assertDatabaseResult(result.error);if(!result.data)throw fail('The batch was not found.',404);
@@ -78,7 +86,7 @@ export function createFulfilmentHandler({authorize=requireStaff,checkOrigin=requ
       if(notifyStatus(body.status)){try{started=launch({database,batchId:id,schedule,source});}catch{console.error('shipping-mail',{code:'SHIPPING_SCHEDULE_REQUIRES_REVIEW'});}}
       return json(res,200,{batch:changed.data,notifications_started:started});
     }catch(error){
-      if(databaseErrors[error.message])error=fail(...databaseErrors[error.message]);
+      if(Object.hasOwn(databaseErrors,error.message))error=fail(...databaseErrors[error.message]);
       if(error.statusCode!==401)console.error('admin-fulfilment',{code:error.code,status:error.statusCode});
       const result=publicError(error);return json(res,result.status,{error:result.message});
     }

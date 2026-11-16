@@ -307,8 +307,16 @@ $("#batch-form").addEventListener("submit", async (event) => {
     const values = Object.fromEntries(new FormData(form));
     const result = await api("/api/admin-fulfilment", { method: "POST", body: JSON.stringify(values) });
     message.textContent = tr(`${result.batch.item_count} boeke is in die batch vasgelê.`, `${result.batch.item_count} books were captured in the batch.`);
-    state.batches = (await api("/api/admin-fulfilment")).batches;
-    renderFulfilment();
+    form.elements.namedItem("label").value = "";
+    try {
+      state.batches = (await api("/api/admin-fulfilment")).batches;
+      renderFulfilment();
+    } catch {
+      message.textContent = tr(
+        "Die batch is geskep. Verfris die lys om dit te sien.",
+        "The batch was created. Refresh the list to see it.",
+      );
+    }
   } catch (error) {
     message.textContent = error.message;
   } finally {

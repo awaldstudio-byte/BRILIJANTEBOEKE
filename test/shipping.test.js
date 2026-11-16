@@ -62,6 +62,34 @@ test('shipping status changes require explicit parent-notification confirmation 
   let res=response();await handler({method:'PATCH',headers:{},body:{id:batchId,status:'dispatched'}},res);assert.equal(res.code,409);assert.equal(transitions,0);
   res=response();await handler({method:'PATCH',headers:{},body:{id:batchId,status:'dispatched',confirm_notifications:true}},res);assert.equal(res.code,200);assert.equal(transitions,1);assert.equal(launched,1);
 });
+test('batch creation explains an invalid period or an empty allocation without leaking database errors',async()=>{
+  const scenarios=[
+    {error:{code:'P0001',message:'INVALID_SCHOOL_PERIOD'},status:400,message:/ordering period for this school/},
+    {error:{code:'P0001',message:'NO_PAID_ITEMS_AVAILABLE'},status:409,message:/no paid books available/},
+    {error:{code:'XX000',message:'private database detail'},status:500,message:/^The request could not be completed\.$/},
+  ];
+  for(const scenario of scenarios){
+    const database={
+      async rpc(name,args){
+        assert.equal(name,'create_fulfilment_batch');
+        assert.equal(args.p_school_id,schoolId);
+        return {data:null,error:scenario.error};
+      },
+      from(){assert.fail('A rejected batch must not be audited as created');},
+    };
+    const handler=createFulfilmentHandler({
+      authorize:async()=>({user:{id:jobId,email:'technical@awaldstudio.com'}}),
+      checkOrigin(){},
+      databaseFactory:()=>database,
+      source,
+    });
+    const res=response();
+    await handler({method:'POST',headers:{},body:{school_id:schoolId,period_id:batchId,label:'Test batch'}},res);
+    assert.equal(res.code,scenario.status);
+    assert.match(res.body.error,scenario.message);
+    assert.doesNotMatch(res.body.error,/P0001|private database detail/);
+  }
+});
 test('shipping UI exposes only valid transitions and reports counts without multiplying parents',()=>{
   assert.deepEqual(allowedBatchStatuses('dispatched'),['dispatched','delivered']);assert.deepEqual(allowedBatchStatuses('delivered'),['delivered']);assert.deepEqual(allowedBatchStatuses('cancelled'),['cancelled']);
   assert.deepEqual(shippingUpdateSummary([{event:'dispatched',status:'sent',count:2},{event:'delivered',status:'sent',count:2},{event:'dispatched',status:'failed',count:1}],'dispatched'),{sent:2,queued:0,processing:0,review:1});
