@@ -1,6 +1,22 @@
 import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { requestJson, submitPayFastForm } from '../assets/payment-checkout.js';
+
+test('checkout CSP allows the supported PayFast redirect origins without wildcard or scheme-wide access', async () => {
+  // PayFast documents payment.payfast.io in its AWS migration notice:
+  // https://support.payfast.help/portal/en/kb/articles/whitelisting-ip-addresses-2-7-2025
+  const configuration = JSON.parse(await readFile(new URL('../vercel.json', import.meta.url), 'utf8'));
+  const policy = configuration.headers.find(({ source }) => source === '/order/(.*)').headers
+    .find(({ key }) => key.toLowerCase() === 'content-security-policy').value;
+  const formAction = policy.split(';').map((directive) => directive.trim().split(/\s+/))
+    .filter(([name]) => name === 'form-action');
+  assert.deepEqual(formAction, [['form-action',
+    'https://sandbox.payfast.co.za',
+    'https://www.payfast.co.za',
+    'https://payment.payfast.io',
+  ]]);
+});
 
 function browser() {
   const listeners = new Map();

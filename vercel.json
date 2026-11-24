@@ -28,7 +28,7 @@
       "headers": [
         { "key": "Cache-Control", "value": "no-store" },
         { "key": "X-Robots-Tag", "value": "noindex, nofollow, noarchive" },
-        { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action https://sandbox.payfast.co.za https://www.payfast.co.za; frame-ancestors 'none'; base-uri 'self'; object-src 'none'" }
+        { "key": "Content-Security-Policy", "value": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; form-action https://sandbox.payfast.co.za https://www.payfast.co.za https://payment.payfast.io; frame-ancestors 'none'; base-uri 'self'; object-src 'none'" }
       ]
     },
     {
