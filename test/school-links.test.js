@@ -162,7 +162,7 @@ test('payment readiness defaults closed; demo never enables real submission', ()
 });
 test('client guard does not send an order when payment is unavailable, even if invoked directly', async () => {
   const source = await readFile(new URL('../assets/order-app.js', import.meta.url), 'utf8');
-  const fn = source.slice(source.indexOf('async function startPayment()'), source.indexOf('function submitExternalForm('));
+  const fn = source.slice(source.indexOf('async function startPayment()'), source.indexOf('function orderStatusUrl()'));
   const button = {}, message = {}; let requests = 0;
   const context = vm.createContext({ preview: false, state: { config: { payments_enabled: false } }, paymentReadiness,
     $: selector => selector === '#pay-button' ? button : message, paymentUnavailableMessage: () => 'Unavailable', api: () => { requests++; throw Error('Must not submit'); } });

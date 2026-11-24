@@ -1,5 +1,6 @@
 import { schoolAccess, paymentReadiness } from './school-links.js';
 import { parentOrderResult } from './parent-order-result.js';
+import { requestJson, submitPayFastForm } from './payment-checkout.js';
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const { token: schoolToken, identifier: schoolIdentifier, periodId } = schoolAccess(location.search);
@@ -18,6 +19,7 @@ const state = {
   consent: null,
   config: null,
   order: null,
+  paymentRecoveryRequired: false,
 };
 
 const englishStatic = new Map([
@@ -282,6 +284,10 @@ $("#pay-button").addEventListener("click", startPayment);
 async function startPayment() {
   const button = $("#pay-button");
   const message = $("#payment-message");
+  if (state.paymentRecoveryRequired && state.order) {
+    location.href = orderStatusUrl();
+    return;
+  }
   if (preview) {
     message.textContent = tr("Voorskoumodus: geen bestelling, persoonlike data of betaling is gestuur nie.", "Preview mode: no order, personal information or payment was sent.");
     return;
@@ -301,15 +307,38 @@ async function startPayment() {
       state.order = result.order;
       sessionStorage.setItem(`briljante_order_token_${state.order.reference}`, state.order.access_token);
     }
+    const statusLink = $('#payment-order-status');
+    statusLink.href = orderStatusUrl();
+    statusLink.textContent = tr(`Gaan bestelling ${state.order.reference} na`, `Check order ${state.order.reference}`);
+    statusLink.hidden = false;
     button.textContent = tr("PayFast word oopgemaak…", "Opening PayFast…");
     const checkout = await api("/api/create-checkout", { method: "POST", body: JSON.stringify({ reference: state.order.reference, order_token: state.order.access_token, language }) });
-    submitExternalForm(checkout.action, checkout.fields);
+    await submitPayFastForm(checkout.action, checkout.fields);
   } catch (error) {
-    message.textContent = state.order ? `${tr("Bestelling", "Order")} ${state.order.reference} ${tr("is geskep.", "was created.")} ${error.message}` : error.message;
+    state.paymentRecoveryRequired = Boolean(state.order);
+    message.textContent = state.order ? `${tr("Bestelling", "Order")} ${state.order.reference} ${tr("is geskep.", "was created.")} ${paymentErrorMessage(error)} ${tr('Gaan hierdie bestelling se status na om met dieselfde bestelling voort te gaan.', 'Check this order\'s status to continue with the same order.')}` : paymentErrorMessage(error);
     button.disabled = false;
-    button.textContent = tr("Betaal met PayFast", "Pay with PayFast");
+    button.textContent = state.order ? tr('Gaan bestellingstatus na', 'Check order status') : tr("Betaal met PayFast", "Pay with PayFast");
   }
 }
+
+function orderStatusUrl() {
+  return `/order/status/?reference=${encodeURIComponent(state.order.reference)}&lang=${language}`;
+}
+
+function paymentErrorMessage(error) {
+  if (error.code === 'REQUEST_TIMEOUT') return tr('Die versoek het te lank geneem. Probeer asseblief weer.', 'The request took too long. Please try again.');
+  if (error.code === 'PAYMENT_NAVIGATION_BLOCKED') return tr('U blaaier het die betalingsbladsy geblokkeer.', 'Your browser blocked the payment page.');
+  if (error.code === 'PAYMENT_NAVIGATION_TIMEOUT') return tr('PayFast het nie oopgemaak nie.', 'PayFast did not open.');
+  return error.message;
+}
+
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted || !state.order) return;
+  state.paymentRecoveryRequired = true;
+  $('#pay-button').disabled = false;
+  $('#pay-button').textContent = tr('Gaan bestellingstatus na', 'Check order status');
+});
 
 async function startDemoPayment() {
   const button = $('#pay-button'), message = $('#payment-message');
@@ -342,27 +371,9 @@ async function startDemoPayment() {
   }
 }
 
-function submitExternalForm(action, fields) {
-  if (!["https://sandbox.payfast.co.za/eng/process", "https://www.payfast.co.za/eng/process"].includes(action)) throw new Error("The payment address could not be verified.");
-  const form = document.createElement("form");
-  form.method = "post";
-  form.action = action;
-  for (const [name, value] of Object.entries(fields)) {
-    const input = document.createElement("input");
-    input.type = "hidden";
-    input.name = name;
-    input.value = value;
-    form.append(input);
-  }
-  document.body.append(form);
-  form.submit();
-}
-
 async function api(url, options = {}) {
-  const response = await fetch(url, { credentials: "same-origin", headers: { "Content-Type": "application/json", ...(options.headers ?? {}) }, ...options });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || tr("Die versoek kon nie voltooi word nie.", "The request could not be completed."));
-  return body;
+  try { return await requestJson(url, options); }
+  catch (error) { throw Object.assign(new Error(paymentErrorMessage(error)), { code: error.code }); }
 }
 
 function applyLanguage() {

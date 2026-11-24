@@ -1,3 +1,5 @@
+import { requestJson, submitPayFastForm } from './payment-checkout.js';
+
 const query = new URLSearchParams(location.search);
 const language = query.get("lang") === "en" ? "en" : "af";
 const reference = (query.get("reference") ?? "").toUpperCase();
@@ -7,6 +9,11 @@ let orderToken = sessionStorage.getItem(`briljante_order_token_${reference}`) ??
 const fragment = new URLSearchParams(location.hash.slice(1));
 let retrying = false;
 document.querySelector('#status-retry').addEventListener('click', retryPayment);
+window.addEventListener('pageshow', (event) => {
+  if (!event.persisted || !orderToken) return;
+  retrying = false;
+  checkStatus(12);
+});
 
 applyLanguage();
 if (!orderToken && fragment.get("token")) {
@@ -21,9 +28,7 @@ else checkStatus(0);
 
 async function checkStatus(attempt) {
   try {
-    const response = await fetch(`/api/order-status?reference=${encodeURIComponent(reference)}&token=${encodeURIComponent(orderToken)}`, { credentials: "same-origin" });
-    const body = await response.json();
-    if (!response.ok) throw new Error(body.error);
+    const body = await requestJson(`/api/order-status?reference=${encodeURIComponent(reference)}&token=${encodeURIComponent(orderToken)}`);
     show(body.order.status, body.order);
     if (body.order.status === "pending_payment" && attempt < 12) setTimeout(() => checkStatus(attempt + 1), 5000);
   } catch {
@@ -98,14 +103,20 @@ async function retryPayment() {
   const message = document.querySelector('#status-retry-message');
   button.disabled = true; message.textContent = '';
   try {
-    const response = await fetch('/api/create-checkout/', {method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},body:JSON.stringify({reference,order_token:orderToken,language})});
-    const checkout = await response.json();
-    if (!response.ok) { await checkStatus(12); throw new Error(checkout.error || tr('Betaling kon nie oopgemaak word nie.','Payment could not be opened.')); }
-    if (!['https://sandbox.payfast.co.za/eng/process','https://www.payfast.co.za/eng/process'].includes(checkout.action)) throw new Error(tr('Die betalingsadres kon nie geverifieer word nie.','The payment address could not be verified.'));
-    const form = document.createElement('form'); form.method='post'; form.action=checkout.action;
-    for (const [name,value] of Object.entries(checkout.fields || {})) { const input=document.createElement('input');input.type='hidden';input.name=name;input.value=value;form.append(input); }
-    document.body.append(form); form.submit();
-  } catch (error) { message.textContent=error.message; retrying=false; button.disabled=false; }
+    const checkout = await requestJson('/api/create-checkout/', {method:'POST',body:JSON.stringify({reference,order_token:orderToken,language})});
+    await submitPayFastForm(checkout.action, checkout.fields);
+  } catch (error) {
+    message.textContent = paymentErrorMessage(error);
+    retrying = false;
+    await checkStatus(12);
+  }
+}
+
+function paymentErrorMessage(error) {
+  if (error.code === 'REQUEST_TIMEOUT') return tr('Die versoek het te lank geneem. Gaan u betalingsgeskiedenis na voordat u weer probeer.', 'The request took too long. Check your payment history before trying again.');
+  if (error.code === 'PAYMENT_NAVIGATION_BLOCKED') return tr('U blaaier het die betalingsbladsy geblokkeer. Gaan u betalingsgeskiedenis na voordat u weer probeer.', 'Your browser blocked the payment page. Check your payment history before trying again.');
+  if (error.code === 'PAYMENT_NAVIGATION_TIMEOUT') return tr('PayFast het nie oopgemaak nie. Gaan u betalingsgeskiedenis na voordat u weer probeer.', 'PayFast did not open. Check your payment history before trying again.');
+  return error.message;
 }
 
 function applyLanguage() {
