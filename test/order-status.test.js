@@ -21,7 +21,7 @@ async function statusPage({ statuses = ["pending_payment"], language = "en", can
     documentElement: {}, body: {append(form){forms.push(form);}},
     createElement(tag){return {tag,children:[],append(child){this.children.push(child);},remove(){this.removed=true;},submit(){this.submitted=true;if(navigation==='success')listeners.get('pagehide')?.({});else if(navigation==='blocked')listeners.get('securitypolicyviolation')?.({effectiveDirective:'form-action',disposition:'enforce'});}};},
     querySelector(selector) {
-      if (!elements.has(selector)) elements.set(selector, { textContent: "", className: "", hidden: true, classList: { add() {} }, addEventListener(event,handler){this[event]=handler;} });
+      if (!elements.has(selector)) elements.set(selector, { textContent: "", className: "", hidden: true, attributes:{}, classList: { add() {} }, addEventListener(event,handler){this[event]=handler;}, setAttribute(name,value){this.attributes[name]=value;}, focus(){document.activeElement=this;} });
       return elements.get(selector);
     },
     querySelectorAll() { return []; },
@@ -37,7 +37,7 @@ async function statusPage({ statuses = ["pending_payment"], language = "en", can
     return { ok: true, json: async () => ({ order: Object.freeze({ status, reference: "BB-26-ABC12345", amount_cents: 66000, school: { name: "Test School" }, ...orderFields }) }) };
   };
   runInNewContext(source, {
-    URLSearchParams, Intl, document, window, confirm:()=>true, NodeFilter: { SHOW_TEXT: 4 },
+    URLSearchParams, Intl, document, window, NodeFilter: { SHOW_TEXT: 4 },
     location: { pathname: "/order/status/", search: `?reference=BB-26-ABC12345&lang=${language}&cancelled=${cancelled}`, hash: fragment },
     sessionStorage: { getItem: (key) => storage.get(key), setItem: (key, value) => storage.set(key, value) },
     history: { replaceState: (_state, _title, url) => historyUrls.push(url) },
@@ -46,7 +46,12 @@ async function statusPage({ statuses = ["pending_payment"], language = "en", can
     submitPayFastForm: (action, fields) => submitPayFastForm(action, fields, {document,eventTarget:window,timeoutMs:10}),
   });
   await new Promise(setImmediate);
-  return { elements, timers, requests, historyUrls, forms };
+  return { elements, timers, requests, historyUrls, forms, document };
+}
+
+async function confirmRetry(page) {
+  await page.elements.get('#status-retry').click();
+  await page.elements.get('#status-retry-confirm').click();
 }
 
 test('a partially refunded order states the refunded and remaining amounts without offering another payment', async()=>{
@@ -120,7 +125,7 @@ test('failed-payment guidance reuses the order while cancelled orders direct use
   }
 });
 test('retry reuses the saved private order and never creates another order or sends its token to PayFast',async()=>{
-  const page=await statusPage(); await page.elements.get('#status-retry').click();
+  const page=await statusPage(); await confirmRetry(page);
   assert.equal(page.requests.length,2); assert.equal(page.requests[1].url,'/api/create-checkout/');
   const body=JSON.parse(page.requests[1].options.body);assert.equal(body.reference,'BB-26-ABC12345');assert.equal(body.order_token,'private-order-access-token');
   assert.equal(page.forms.length,1);assert.equal(page.forms[0].submitted,true);assert.equal(page.forms[0].action,'https://sandbox.payfast.co.za/eng/process');
@@ -130,7 +135,7 @@ test('retry reuses the saved private order and never creates another order or se
 test('blocked or stalled PayFast navigation restores same-order retry and rechecks payment state', async()=>{
   for(const navigation of ['blocked','timeout']) {
     const page=await statusPage({navigation});
-    await page.elements.get('#status-retry').click();
+    await confirmRetry(page);
     assert.match(page.elements.get('#status-retry-message').textContent, /blocked the payment page|PayFast did not open/);
     assert.equal(page.elements.get('#status-retry').disabled,false);
     assert.equal(page.requests.filter(({options})=>options.method==='POST').length,1);
@@ -141,11 +146,52 @@ test('blocked or stalled PayFast navigation restores same-order retry and rechec
 
 test('a checkout timeout cannot offer another payment after the status becomes paid',async()=>{
   const page=await statusPage({statuses:['pending_payment','paid'],checkoutError:'REQUEST_TIMEOUT'});
-  await page.elements.get('#status-retry').click();
+  await confirmRetry(page);
   assert.equal(page.elements.get('#status-retry').hidden,true);
   assert.equal(page.elements.get('#status-title').textContent,'Payment received');
   assert.match(page.elements.get('#status-retry-message').textContent,/request took too long/);
   assert.equal(page.forms.length,0);
+});
+
+test('payment retry shows the exact safety warning inline and cancellation sends no checkout request', async()=>{
+  for(const language of ['en','af']) {
+    const page=await statusPage({language});
+    await page.elements.get('#status-retry').click();
+    assert.equal(page.elements.get('#status-retry-confirmation').hidden,false);
+    assert.equal(page.elements.get('#status-retry').attributes['aria-expanded'],'true');
+    assert.equal(page.elements.get('#status-retry-warning').textContent,language==='en'
+      ? 'Check your payment history first. If you already paid, contact Briljante and do not pay again. Continue with this same order?'
+      : 'Kontroleer eers u betalingsgeskiedenis. Indien u reeds betaal het, kontak Briljante en moenie weer betaal nie. Gaan voort met dieselfde bestelling?');
+    assert.equal(page.document.activeElement,page.elements.get('#status-retry-cancel'));
+    assert.equal(page.requests.length,1);
+    await page.elements.get('#status-retry-cancel').click();
+    assert.equal(page.elements.get('#status-retry-confirmation').hidden,true);
+    assert.equal(page.elements.get('#status-retry-warning').textContent,'');
+    assert.equal(page.elements.get('#status-retry').attributes['aria-expanded'],'false');
+    assert.equal(page.document.activeElement,page.elements.get('#status-retry'));
+    await page.elements.get('#status-retry-confirm').click();
+    assert.equal(page.requests.length,1,'cancelled confirmation cannot be reused');
+  }
+});
+
+test('confirming retry twice submits only one same-order checkout',async()=>{
+  const page=await statusPage();
+  await page.elements.get('#status-retry').click();
+  const first=page.elements.get('#status-retry-confirm').click();
+  const second=page.elements.get('#status-retry-confirm').click();
+  await Promise.all([first,second]);
+  assert.equal(page.requests.filter(({options})=>options.method==='POST').length,1);
+  assert.equal(page.elements.get('#status-retry-confirmation').hidden,true);
+  assert.equal(page.elements.get('#status-retry-warning').textContent,'');
+});
+
+test('a verified payment arriving during confirmation closes it and prevents checkout',async()=>{
+  const page=await statusPage({statuses:['pending_payment','paid']});
+  await page.elements.get('#status-retry').click();
+  await page.timers.shift()();
+  assert.equal(page.elements.get('#status-retry-confirmation').hidden,true);
+  await page.elements.get('#status-retry-confirm').click();
+  assert.equal(page.requests.filter(({options})=>options.method==='POST').length,0);
 });
 
 test("cleaning an email token fragment retains the cancellation hint", async () => {

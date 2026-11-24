@@ -65,6 +65,41 @@ test('enforced form-action rejection and a stalled navigation reject and remove 
   }
 });
 
+test('blocked-navigation diagnostics contain only HTTP origins and omit private URL and form data', async (t) => {
+  const warnings = [];
+  t.mock.method(console, 'warn', (...args) => warnings.push(args));
+  for (const [blockedURI, origin] of [
+    ['https://private-user:private-password@payment.payfast.io/private-path?token=private-query#private-fragment', 'https://payment.payfast.io'],
+    ['http://example.invalid:8080/private-path?token=private-query', 'http://example.invalid:8080'],
+  ]) {
+    const page = browser();
+    const navigation = submitPayFastForm('https://www.payfast.co.za/eng/process', { signature: 'private-signature' }, page);
+    page.document.emit('securitypolicyviolation', { effectiveDirective: 'form-action', disposition: 'enforce', blockedURI });
+    await assert.rejects(navigation, (error) => {
+      assert.equal(error.code, 'PAYMENT_NAVIGATION_BLOCKED');
+      assert.equal(error.blockedOrigin, origin);
+      assert.doesNotMatch(`${error.message} ${JSON.stringify(error)}`, /private-/);
+      return true;
+    });
+    assert.deepEqual(warnings.at(-1), ['PayFast navigation blocked by form-action policy.', { blockedOrigin: origin }]);
+  }
+  assert.doesNotMatch(JSON.stringify(warnings), /private-/);
+
+  const previousWarnings = warnings.length;
+  for (const blockedURI of [undefined, 'not a URL', '/relative?token=private-query', 'data:text/plain,private-data', 'javascript:private-code']) {
+    const page = browser();
+    const navigation = submitPayFastForm('https://www.payfast.co.za/eng/process', {}, page);
+    page.document.emit('securitypolicyviolation', { effectiveDirective: 'form-action', disposition: 'enforce', blockedURI });
+    await assert.rejects(navigation, (error) => {
+      assert.equal(error.code, 'PAYMENT_NAVIGATION_BLOCKED');
+      assert.equal(Object.hasOwn(error, 'blockedOrigin'), false);
+      assert.doesNotMatch(`${error.message} ${JSON.stringify(error)}`, /private-|not a URL/);
+      return true;
+    });
+  }
+  assert.equal(warnings.length, previousWarnings, 'invalid or non-HTTP locations are not logged');
+});
+
 test('report-only and unrelated policy events do not report a failed payment navigation', async () => {
   const page = browser();
   const navigation = submitPayFastForm('https://www.payfast.co.za/eng/process', {}, page);

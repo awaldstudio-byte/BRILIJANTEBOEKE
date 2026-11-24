@@ -8,9 +8,16 @@ const money = new Intl.NumberFormat(language === "en" ? "en-ZA" : "af-ZA", { sty
 let orderToken = sessionStorage.getItem(`briljante_order_token_${reference}`) ?? "";
 const fragment = new URLSearchParams(location.hash.slice(1));
 let retrying = false;
-document.querySelector('#status-retry').addEventListener('click', retryPayment);
+let retryConfirmationOpen = false;
+document.querySelector('#status-retry').addEventListener('click', openRetryConfirmation);
+document.querySelector('#status-retry-confirm').addEventListener('click', retryPayment);
+document.querySelector('#status-retry-cancel').addEventListener('click', () => closeRetryConfirmation());
+document.querySelector('#status-retry-confirmation').addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') { event.preventDefault(); closeRetryConfirmation(); }
+});
 window.addEventListener('pageshow', (event) => {
   if (!event.persisted || !orderToken) return;
+  closeRetryConfirmation(false);
   retrying = false;
   checkStatus(12);
 });
@@ -39,6 +46,7 @@ async function checkStatus(attempt) {
 function show(status, order = null) {
   const retry = document.querySelector('#status-retry');
   retry.hidden = !order || !orderToken || !['pending_payment','payment_failed'].includes(status);
+  if (retry.hidden) closeRetryConfirmation(false);
   retry.disabled = retrying;
   retry.textContent = tr('Probeer betaling weer','Try payment again');
   const icon = document.querySelector("#status-icon");
@@ -95,9 +103,32 @@ function show(status, order = null) {
   }
 }
 
-async function retryPayment() {
+function openRetryConfirmation() {
   if (retrying || !orderToken || document.querySelector('#status-retry').hidden) return;
-  if (!confirm(tr('Kontroleer eers u betalingsgeskiedenis. Indien u reeds betaal het, kontak Briljante en moenie weer betaal nie. Gaan voort met dieselfde bestelling?', 'Check your payment history first. If you already paid, contact Briljante and do not pay again. Continue with this same order?'))) return;
+  if (retryConfirmationOpen) return;
+  retryConfirmationOpen = true;
+  document.querySelector('#status-retry-confirm-title').textContent = tr('Bevestig betalingspoging', 'Confirm payment retry');
+  document.querySelector('#status-retry-warning').textContent = tr('Kontroleer eers u betalingsgeskiedenis. Indien u reeds betaal het, kontak Briljante en moenie weer betaal nie. Gaan voort met dieselfde bestelling?', 'Check your payment history first. If you already paid, contact Briljante and do not pay again. Continue with this same order?');
+  document.querySelector('#status-retry-cancel').textContent = tr('Kanselleer', 'Cancel');
+  document.querySelector('#status-retry-confirm').textContent = tr('Gaan voort met PayFast', 'Continue to PayFast');
+  document.querySelector('#status-retry-confirmation').hidden = false;
+  document.querySelector('#status-retry').setAttribute('aria-expanded', 'true');
+  document.querySelector('#status-retry-cancel').focus();
+}
+
+function closeRetryConfirmation(restoreFocus = true) {
+  const wasOpen = retryConfirmationOpen;
+  retryConfirmationOpen = false;
+  document.querySelector('#status-retry-confirmation').hidden = true;
+  document.querySelector('#status-retry-warning').textContent = '';
+  const button = document.querySelector('#status-retry');
+  button.setAttribute('aria-expanded', 'false');
+  if (restoreFocus && wasOpen && !button.hidden) button.focus();
+}
+
+async function retryPayment() {
+  if (retrying || !retryConfirmationOpen || !orderToken || document.querySelector('#status-retry').hidden) return;
+  closeRetryConfirmation(false);
   retrying = true;
   const button = document.querySelector('#status-retry');
   const message = document.querySelector('#status-retry-message');

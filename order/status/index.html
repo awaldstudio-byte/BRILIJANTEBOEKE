@@ -19,7 +19,12 @@
         <h1 id="status-title">Betaling word nagegaan</h1>
         <p id="status-copy">PayFast se bevestiging kan ’n kort rukkie neem. Hierdie bladsy sal outomaties bywerk.</p>
         <dl id="status-details" hidden><div><dt>Skool</dt><dd id="status-school"></dd></div><div><dt>Bedrag</dt><dd id="status-amount"></dd></div></dl>
-        <button id="status-retry" class="btn btn-primary" type="button" hidden>Probeer betaling weer</button>
+        <button id="status-retry" class="btn btn-primary" type="button" aria-controls="status-retry-confirmation" aria-expanded="false" hidden>Probeer betaling weer</button>
+        <div id="status-retry-confirmation" class="notice-card" role="group" aria-labelledby="status-retry-confirm-title" aria-describedby="status-retry-warning" hidden>
+          <p id="status-retry-confirm-title" class="phase-label"></p>
+          <p id="status-retry-warning"></p>
+          <div class="button-row"><button id="status-retry-cancel" class="btn btn-outline" type="button">Kanselleer</button><button id="status-retry-confirm" class="btn btn-primary" type="button">Gaan voort met PayFast</button></div>
+        </div>
         <p id="status-retry-message" role="status"></p>
         <a class="btn btn-outline" href="/">Terug na Briljante Boeke</a>
       </section>

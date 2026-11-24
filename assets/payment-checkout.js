@@ -7,6 +7,16 @@ function checkoutError(code, message) {
   return Object.assign(new Error(message), { code });
 }
 
+function httpOrigin(value) {
+  if (typeof value !== 'string') return undefined;
+  try {
+    const url = new URL(value);
+    return ['https:', 'http:'].includes(url.protocol) ? url.origin : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function requestJson(url, options = {}, { fetchImpl = globalThis.fetch, timeoutMs = 30_000 } = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -60,7 +70,13 @@ export function submitPayFastForm(action, fields, {
     };
     const blocked = (event) => {
       if (event.effectiveDirective === 'form-action' && event.disposition !== 'report') {
-        finish(checkoutError('PAYMENT_NAVIGATION_BLOCKED', 'Your browser blocked the payment page. Check the order status before trying again.'));
+        const error = checkoutError('PAYMENT_NAVIGATION_BLOCKED', 'Your browser blocked the payment page. Check the order status before trying again.');
+        const blockedOrigin = httpOrigin(event.blockedURI);
+        if (blockedOrigin) {
+          error.blockedOrigin = blockedOrigin;
+          console.warn('PayFast navigation blocked by form-action policy.', { blockedOrigin });
+        }
+        finish(error);
       }
     };
     const departed = () => finish();
